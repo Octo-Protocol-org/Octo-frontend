@@ -102,6 +102,40 @@ export function stroopsToAmount(stroops: number): string {
   return (stroops / 10_000_000).toFixed(7);
 }
 
+/** Parse a decimal XLM amount string into integer stroops, or null if invalid. */
+export function amountToStroops(xlm: string): number | null {
+  const n = Number(xlm);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 10_000_000);
+}
+
+export type WithdrawResult = {
+  id: string;
+  status: string;
+  stellar_tx_hash: string | null;
+  destination: string;
+  amount_stroops: number;
+};
+
+/** Withdraw funds from the master wallet (dashboard login token required). */
+export function withdraw(
+  token: string,
+  id: string,
+  destination: string,
+  amountStroops: number,
+  idempotencyKey: string,
+) {
+  return apiFetch<WithdrawResult>(`/v1/wallets/${id}/withdraw`, {
+    method: "POST",
+    token,
+    headers: { "idempotency-key": idempotencyKey },
+    body: JSON.stringify({
+      destination,
+      amount_stroops: amountStroops,
+    }),
+  });
+}
+
 export type ApiKeyInfo = {
   wallet_id: string;
   configured: boolean;

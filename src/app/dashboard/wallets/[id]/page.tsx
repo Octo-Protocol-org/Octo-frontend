@@ -9,6 +9,8 @@ import {
   listAddresses,
   listTransactions,
   createAddress,
+  withdraw,
+  amountToStroops,
   stroopsToAmount,
   type WalletView,
   type Balance,
@@ -16,6 +18,8 @@ import {
   type Transaction,
 } from "@/lib/wallets";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { Modal, CopyField } from "@/components/dashboard/Modal";
+import { ApiError } from "@/lib/api";
 
 export default function WalletOverview({
   params,
@@ -30,6 +34,14 @@ export default function WalletOverview({
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [creating, setCreating] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+
+  function refresh() {
+    if (!token) return;
+    getBalances(token, id).then(setBalances).catch(() => {});
+    listTransactions(token, id).then(setTxns).catch(() => {});
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -125,9 +137,12 @@ export default function WalletOverview({
             {/* action row */}
             <div className="flex flex-wrap gap-3">
               <ActionButton label="New address" onClick={onNewAddress} loading={creating} />
-              <ActionButton label="Deposit" disabled />
-              <ActionButton label="Withdraw" disabled />
-              <ActionButton label="Refresh balances" onClick={() => token && getBalances(token, id).then(setBalances)} />
+              <ActionButton label="Deposit" onClick={() => setShowDeposit(true)} />
+              <ActionButton label="Withdraw" onClick={() => setShowWithdraw(true)} />
+              <ActionButton
+                label="Refresh balances"
+                onClick={() => token && getBalances(token, id).then(setBalances)}
+              />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
@@ -238,7 +253,194 @@ export default function WalletOverview({
           </main>
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositModal
+          addresses={addresses}
+          baseAddress={wallet?.address ?? ""}
+          onClose={() => setShowDeposit(false)}
+          onNewAddress={onNewAddress}
+          creating={creating}
+        />
+      )}
+      {showWithdraw && token && (
+        <WithdrawModal
+          token={token}
+          walletId={id}
+          available={xlmAmount}
+          onClose={() => setShowWithdraw(false)}
+          onDone={() => {
+            setShowWithdraw(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function DepositModal({
+  addresses,
+  baseAddress,
+  onClose,
+  onNewAddress,
+  creating,
+}: {
+  addresses: Address[];
+  baseAddress: string;
+  onClose: () => void;
+  onNewAddress: () => void;
+  creating: boolean;
+}) {
+  const latest = addresses[0];
+  return (
+    <Modal title="Deposit" onClose={onClose}>
+      <p className="text-sm text-muted">
+        Share a deposit address with the sender. Funds sent to it land directly
+        in this master wallet and are attributed to the customer.
+      </p>
+
+      {latest ? (
+        <div className="mt-5 space-y-4">
+          <CopyField label="Muxed address (recommended)" value={latest.muxed_address} />
+          <CopyField label="Base address (G…+memo fallback)" value={baseAddress} />
+          <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-muted">
+            If the sender can&apos;t use the <code className="text-foreground">M…</code>{" "}
+            address, send to the base address with memo (id){" "}
+            <span className="text-foreground">{latest.memo_id}</span>.
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-lg border border-dashed border-white/15 p-5 text-center text-sm text-muted">
+          No addresses yet. Generate one to receive a deposit.
+          <button
+            onClick={onNewAddress}
+            disabled={creating}
+            className="mt-3 block w-full rounded-lg bg-burgundy py-2 text-sm font-semibold text-white hover:bg-burgundy-bright disabled:opacity-60"
+          >
+            {creating ? "Generating…" : "Generate address"}
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function WithdrawModal({
+  token,
+  walletId,
+  available,
+  onClose,
+  onDone,
+}: {
+  token: string;
+  walletId: string;
+  available: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [destination, setDestination] = useState("");
+  const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ status: string; hash: string | null } | null>(
+    null,
+  );
+
+  async function submit() {
+    setError(null);
+    const stroops = amountToStroops(amount);
+    if (!destination.startsWith("G") && !destination.startsWith("M")) {
+      setError("Destination must be a Stellar address (G… or M…).");
+      return;
+    }
+    if (stroops === null) {
+      setError("Enter a valid amount greater than 0.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // A fresh idempotency key per submit attempt.
+      const key = `wd-${crypto.randomUUID()}`;
+      const res = await withdraw(token, walletId, destination, stroops, key);
+      setResult({ status: res.status, hash: res.stellar_tx_hash });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Withdrawal failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (result) {
+    const ok = result.status === "confirmed";
+    return (
+      <Modal title="Withdrawal" onClose={onDone}>
+        <div className="text-center">
+          <p className={`text-3xl ${ok ? "text-burgundy-bright" : "text-amber-400"}`}>
+            {ok ? "✓" : "!"}
+          </p>
+          <p className="mt-2 font-medium capitalize text-foreground">
+            {result.status}
+          </p>
+          {result.hash && (
+            <p className="mt-2 break-all font-mono text-xs text-muted">
+              {result.hash}
+            </p>
+          )}
+          <button
+            onClick={onDone}
+            className="mt-6 w-full rounded-lg bg-burgundy py-2.5 text-sm font-semibold text-white hover:bg-burgundy-bright"
+          >
+            Done
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="Withdraw" onClose={onClose}>
+      <p className="text-sm text-muted">
+        Send XLM from this master wallet. Available:{" "}
+        <span className="text-foreground">{available} XLM</span>.
+      </p>
+
+      <div className="mt-5 space-y-4">
+        <div>
+          <label className="text-xs text-muted">Destination address</label>
+          <input
+            value={destination}
+            onChange={(e) => setDestination(e.target.value.trim())}
+            placeholder="G… or M…"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted">Amount (XLM)</label>
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            inputMode="decimal"
+            placeholder="0.0000000"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
+          />
+        </div>
+
+        {error && (
+          <p className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={submit}
+          disabled={submitting}
+          className="w-full rounded-lg bg-burgundy py-2.5 text-sm font-semibold text-white hover:bg-burgundy-bright disabled:opacity-60"
+        >
+          {submitting ? "Submitting…" : "Withdraw"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
