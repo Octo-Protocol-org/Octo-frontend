@@ -1,3 +1,30 @@
+# Octo — Frontend
+
+The Next.js dashboard for **Octo**, a Stellar-native Wallet-as-a-Service. It is a pure client of
+the Octo backend API (the Rust `octo-server`), which lives in a separate repo:
+**[Octo-Protocol](https://github.com/Octo-Protocol-org/Octo-Protocol)**.
+
+## Configuration
+
+Copy `.env.example` to `.env.local` and point it at your backend:
+
+```bash
+cp .env.example .env.local
+# NEXT_PUBLIC_OCTO_API_URL=http://localhost:8080   (local) or your deployed API origin
+```
+
+> **Note:** `NEXT_PUBLIC_OCTO_API_URL` is **inlined at build time** by Next.js, not read at
+> runtime. Changing it requires a rebuild/redeploy. On Vercel, set it in the project's
+> Environment Variables and redeploy — editing it without a new build has no effect.
+
+## Deploy
+
+Deploys to **Vercel** (zero-config Next.js). Set `NEXT_PUBLIC_OCTO_API_URL` to the deployed API
+origin in the Vercel project settings. Make sure that origin is included in the backend's
+`CORS_ALLOWED_ORIGINS` allowlist.
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
