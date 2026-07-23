@@ -9,17 +9,26 @@ import {
   listAddresses,
   listTransactions,
   createAddress,
-  withdraw,
-  amountToStroops,
+  USDC_TESTNET,
   stroopsToAmount,
   type WalletView,
   type Balance,
   type Address,
   type Transaction,
 } from "@/lib/wallets";
+import {
+  unlockWallet,
+  getSigningInfo,
+  submitSigned,
+  buildSignedPayment,
+  buildSignedChangeTrust,
+  type SubmitResult,
+} from "@/lib/sdk";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
+import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { ApiError } from "@/lib/api";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 export default function WalletOverview({
   params,
@@ -36,10 +45,13 @@ export default function WalletOverview({
   const [creating, setCreating] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showTrustline, setShowTrustline] = useState(false);
 
   function refresh() {
     if (!token) return;
     getBalances(token, id).then(setBalances).catch(() => {});
+    // The submit-signed endpoint records the outbound transfer server-side before responding,
+    // so a plain re-fetch reflects it (no optimistic insert needed).
     listTransactions(token, id).then(setTxns).catch(() => {});
   }
 
@@ -49,6 +61,17 @@ export default function WalletOverview({
     getBalances(token, id).then(setBalances).catch(() => setBalances([]));
     listAddresses(token, id).then(setAddresses).catch(() => setAddresses([]));
     listTransactions(token, id).then(setTxns).catch(() => setTxns([]));
+  }, [token, id]);
+
+  // Silently re-fetch balances + recent transactions in the background so a new deposit shows up
+  // without a manual refresh — no loading indicator here, that's only for explicit refresh actions.
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      getBalances(token, id).then(setBalances).catch(() => {});
+      listTransactions(token, id).then(setTxns).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
   }, [token, id]);
 
   async function onNewAddress() {
@@ -64,14 +87,15 @@ export default function WalletOverview({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 
   const xlm = balances.find((b) => b.asset_type === "native");
   const xlmAmount = xlm ? xlm.balance : "0";
+  const hasUsdc = balances.some(
+    (b) => b.asset_code === USDC_TESTNET.code && b.asset_issuer === USDC_TESTNET.issuer,
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -102,7 +126,8 @@ export default function WalletOverview({
             </button>
           </header>
 
-          <main className="flex-1 space-y-6 px-8 py-8">
+          <main className="flex-1 px-8 py-8">
+          <div className="mx-auto w-full max-w-6xl space-y-6">
             {/* header */}
             <div>
               <h1 className="text-2xl font-semibold text-foreground">
@@ -139,6 +164,11 @@ export default function WalletOverview({
               <ActionButton label="New address" onClick={onNewAddress} loading={creating} />
               <ActionButton label="Deposit" onClick={() => setShowDeposit(true)} />
               <ActionButton label="Withdraw" onClick={() => setShowWithdraw(true)} />
+              <ActionButton
+                label={hasUsdc ? "USDC trusted ✓" : "Add USDC trustline"}
+                onClick={() => setShowTrustline(true)}
+                disabled={hasUsdc}
+              />
               <ActionButton
                 label="Refresh balances"
                 onClick={() => token && getBalances(token, id).then(setBalances)}
@@ -227,9 +257,19 @@ export default function WalletOverview({
                           {t.asset_code === "native" ? "XLM" : t.asset_code}
                         </td>
                         <td className="py-3 font-mono text-xs">
-                          {t.stellar_tx_hash
-                            ? `${t.stellar_tx_hash.slice(0, 8)}…`
-                            : "—"}
+                          {t.stellar_tx_hash ? (
+                            <a
+                              href={`https://stellar.expert/explorer/testnet/tx/${t.stellar_tx_hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="View transaction on Stellar Explorer"
+                              className="text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"
+                            >
+                              {`${t.stellar_tx_hash.slice(0, 8)}…`}
+                            </a>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="py-3">
                           <span className="rounded-md bg-white/5 px-2 py-0.5 text-xs capitalize">
@@ -250,6 +290,7 @@ export default function WalletOverview({
                 </table>
               )}
             </Panel>
+          </div>
           </main>
         </div>
       </div>
@@ -267,7 +308,7 @@ export default function WalletOverview({
         <WithdrawModal
           token={token}
           walletId={id}
-          available={xlmAmount}
+          balances={balances}
           onClose={() => setShowWithdraw(false)}
           onDone={() => {
             setShowWithdraw(false);
@@ -275,7 +316,159 @@ export default function WalletOverview({
           }}
         />
       )}
+      {showTrustline && token && (
+        <TrustlineModal
+          token={token}
+          walletId={id}
+          onClose={() => setShowTrustline(false)}
+          onDone={() => {
+            setShowTrustline(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function TrustlineModal({
+  token,
+  walletId,
+  onClose,
+  onDone,
+}: {
+  token: string;
+  walletId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    status: string;
+    hash: string | null;
+    detail: string | null;
+  } | null>(null);
+
+  async function submit() {
+    setError(null);
+    if (!password) {
+      setError("Enter your wallet password to sign.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Unlock the key locally (decrypt with password), build + sign the ChangeTrust in the
+      // browser, then relay the signed XDR. The private key never leaves this device.
+      const keypair = await unlockWallet(token, walletId, password);
+      const info = await getSigningInfo(token, walletId);
+      const signedXdr = buildSignedChangeTrust(keypair, info, {
+        asset: { code: USDC_TESTNET.code, issuer: USDC_TESTNET.issuer },
+      });
+      const res: SubmitResult = await submitSigned(token, walletId, signedXdr);
+      setResult({
+        status: res.status,
+        hash: res.stellar_tx_hash,
+        detail: res.detail ?? null,
+      });
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Could not add the trustline.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (result) {
+    const ok = result.status === "confirmed";
+    return (
+      <Modal title="USDC trustline" onClose={onDone}>
+        <div className="text-center">
+          <p className={`text-3xl ${ok ? "text-burgundy-bright" : "text-amber-400"}`}>
+            {ok ? "✓" : "!"}
+          </p>
+          <p className="mt-2 font-medium capitalize text-foreground">
+            {ok ? "Trustline established" : result.status}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {ok
+              ? "This wallet can now receive USDC."
+              : result.detail ??
+                "The trustline could not be established. Ensure the wallet holds enough XLM for the reserve."}
+          </p>
+          {result.hash && (
+            <a
+              href={`https://stellar.expert/explorer/testnet/tx/${result.hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View transaction on Stellar Explorer"
+              className="mt-2 block break-all font-mono text-xs text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"
+            >
+              {result.hash}
+            </a>
+          )}
+          <button
+            onClick={onDone}
+            className="mt-6 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold"
+          >
+            Done
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="Add USDC trustline" onClose={onClose}>
+      <p className="text-sm text-muted">
+        Establishing a trustline lets this master wallet hold and receive{" "}
+        <span className="text-foreground">USDC</span> on Stellar. It costs a
+        small XLM base reserve and requires signing from your master wallet.
+      </p>
+
+      <div className="mt-5 space-y-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs">
+        <p className="text-muted">
+          Asset: <span className="text-foreground">USDC</span>
+        </p>
+        <p className="break-all text-muted">
+          Issuer:{" "}
+          <span className="font-mono text-foreground">{USDC_TESTNET.issuer}</span>
+        </p>
+        <p className="text-muted">Network: Stellar Testnet</p>
+      </div>
+
+      <div className="mt-4">
+        <label className="text-xs text-muted">Wallet password (to sign)</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Your encryption password"
+          autoComplete="current-password"
+          className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
+        />
+      </div>
+
+      {error && (
+        <p className="mt-4 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+          {error}
+        </p>
+      )}
+
+      <button
+        onClick={submit}
+        disabled={submitting}
+        className="mt-5 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
+      >
+        {submitting ? "Signing…" : "Add trustline"}
+      </button>
+    </Modal>
   );
 }
 
@@ -316,7 +509,7 @@ function DepositModal({
           <button
             onClick={onNewAddress}
             disabled={creating}
-            className="mt-3 block w-full rounded-lg bg-burgundy py-2 text-sm font-semibold text-white hover:bg-burgundy-bright disabled:opacity-60"
+            className="mt-3 block w-full rounded-lg glass-btn-primary py-2 text-sm font-semibold disabled:opacity-60"
           >
             {creating ? "Generating…" : "Generate address"}
           </button>
@@ -326,46 +519,89 @@ function DepositModal({
   );
 }
 
+/** A withdrawable asset derived from the wallet's balances. */
+type WithdrawAsset = {
+  code: string; // display code, e.g. "XLM" or "USDC"
+  available: string;
+  /** undefined => native XLM; otherwise the credit asset to send. */
+  asset?: { code: string; issuer: string };
+};
+
 function WithdrawModal({
   token,
   walletId,
-  available,
+  balances,
   onClose,
   onDone,
 }: {
   token: string;
   walletId: string;
-  available: string;
+  balances: Balance[];
   onClose: () => void;
   onDone: () => void;
 }) {
+  // Build the selectable asset list: XLM first, then any credit asset the
+  // wallet holds a trustline for (USDC, etc.).
+  const assets: WithdrawAsset[] = [
+    {
+      code: "XLM",
+      available: balances.find((b) => b.asset_type === "native")?.balance ?? "0",
+    },
+    ...balances
+      .filter((b) => b.asset_type !== "native" && b.asset_code && b.asset_issuer)
+      .map((b) => ({
+        code: b.asset_code as string,
+        available: b.balance,
+        asset: { code: b.asset_code as string, issuer: b.asset_issuer as string },
+      })),
+  ];
+
+  const [selectedCode, setSelectedCode] = useState(assets[0].code);
   const [destination, setDestination] = useState("");
   const [amount, setAmount] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ status: string; hash: string | null } | null>(
-    null,
-  );
+  const [result, setResult] = useState<SubmitResult | null>(null);
+
+  const selected =
+    assets.find((a) => a.code === selectedCode) ?? assets[0];
 
   async function submit() {
     setError(null);
-    const stroops = amountToStroops(amount);
     if (!destination.startsWith("G") && !destination.startsWith("M")) {
       setError("Destination must be a Stellar address (G… or M…).");
       return;
     }
-    if (stroops === null) {
+    if (!(Number(amount) > 0)) {
       setError("Enter a valid amount greater than 0.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your wallet password to sign.");
       return;
     }
     setSubmitting(true);
     try {
-      // A fresh idempotency key per submit attempt.
-      const key = `wd-${crypto.randomUUID()}`;
-      const res = await withdraw(token, walletId, destination, stroops, key);
-      setResult({ status: res.status, hash: res.stellar_tx_hash });
+      // Unlock, build + sign the payment locally, then relay the signed XDR. The private key
+      // never leaves this device.
+      const keypair = await unlockWallet(token, walletId, password);
+      const info = await getSigningInfo(token, walletId);
+      const signedXdr = buildSignedPayment(keypair, info, {
+        destination,
+        amount, // decimal string, e.g. "1.5"
+        asset: selected.asset, // undefined => XLM
+      });
+      const res = await submitSigned(token, walletId, signedXdr);
+      setResult(res);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Withdrawal failed.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Withdrawal failed.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -373,8 +609,9 @@ function WithdrawModal({
 
   if (result) {
     const ok = result.status === "confirmed";
+    const finish = () => onDone();
     return (
-      <Modal title="Withdrawal" onClose={onDone}>
+      <Modal title="Withdrawal" onClose={finish}>
         <div className="text-center">
           <p className={`text-3xl ${ok ? "text-burgundy-bright" : "text-amber-400"}`}>
             {ok ? "✓" : "!"}
@@ -382,14 +619,23 @@ function WithdrawModal({
           <p className="mt-2 font-medium capitalize text-foreground">
             {result.status}
           </p>
-          {result.hash && (
-            <p className="mt-2 break-all font-mono text-xs text-muted">
-              {result.hash}
-            </p>
+          {!ok && result.detail && (
+            <p className="mt-1 text-sm text-muted">{result.detail}</p>
+          )}
+          {result.stellar_tx_hash && (
+            <a
+              href={`https://stellar.expert/explorer/testnet/tx/${result.stellar_tx_hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View transaction on Stellar Explorer"
+              className="mt-2 block break-all font-mono text-xs text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"
+            >
+              {result.stellar_tx_hash}
+            </a>
           )}
           <button
-            onClick={onDone}
-            className="mt-6 w-full rounded-lg bg-burgundy py-2.5 text-sm font-semibold text-white hover:bg-burgundy-bright"
+            onClick={finish}
+            className="mt-6 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold"
           >
             Done
           </button>
@@ -401,11 +647,38 @@ function WithdrawModal({
   return (
     <Modal title="Withdraw" onClose={onClose}>
       <p className="text-sm text-muted">
-        Send XLM from this master wallet. Available:{" "}
-        <span className="text-foreground">{available} XLM</span>.
+        Send {selected.code} from this master wallet. Available:{" "}
+        <span className="text-foreground">
+          {selected.available} {selected.code}
+        </span>
+        .
       </p>
 
       <div className="mt-5 space-y-4">
+        <div>
+          <label className="text-xs text-muted">Asset</label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {assets.map((a) => (
+              <button
+                key={a.code}
+                type="button"
+                onClick={() => setSelectedCode(a.code)}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  a.code === selectedCode
+                    ? "border-burgundy-bright bg-burgundy/20 text-foreground"
+                    : "border-white/10 bg-black/40 text-muted hover:border-white/25"
+                }`}
+              >
+                {a.code}
+              </button>
+            ))}
+          </div>
+          {assets.length === 1 && (
+            <p className="mt-1.5 text-[11px] text-muted">
+              Add a USDC trustline to withdraw USDC.
+            </p>
+          )}
+        </div>
         <div>
           <label className="text-xs text-muted">Destination address</label>
           <input
@@ -416,7 +689,7 @@ function WithdrawModal({
           />
         </div>
         <div>
-          <label className="text-xs text-muted">Amount (XLM)</label>
+          <label className="text-xs text-muted">Amount ({selected.code})</label>
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -424,6 +697,20 @@ function WithdrawModal({
             placeholder="0.0000000"
             className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
+        </div>
+        <div>
+          <label className="text-xs text-muted">Wallet password (to sign)</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your encryption password"
+            autoComplete="current-password"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Signs locally on this device — your key never leaves the browser.
+          </p>
         </div>
 
         {error && (
@@ -435,70 +722,14 @@ function WithdrawModal({
         <button
           onClick={submit}
           disabled={submitting}
-          className="w-full rounded-lg bg-burgundy py-2.5 text-sm font-semibold text-white hover:bg-burgundy-bright disabled:opacity-60"
+          className="w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
         >
-          {submitting ? "Submitting…" : "Withdraw"}
+          {submitting ? "Signing…" : "Withdraw"}
         </button>
       </div>
     </Modal>
   );
 }
 
-function Stat({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-burgundy-soft/30 p-4">
-      <p className="text-[11px] text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-muted">{sub}</p>}
-    </div>
-  );
-}
-
-function ActionButton({
-  label,
-  onClick,
-  disabled,
-  loading,
-}: {
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  loading?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-foreground transition-colors hover:border-burgundy/50 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {loading ? "…" : label}
-    </button>
-  );
-}
-
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-burgundy-soft/20 p-5">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-6 text-center text-sm text-muted">{children}</p>;
-}
+// Stat / ActionButton / Panel / Empty moved to @/components/dashboard/WalletUI so every wallet
+// sub-page (Overview, Assets, ...) shares the same building blocks.

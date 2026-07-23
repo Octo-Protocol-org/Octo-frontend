@@ -19,6 +19,7 @@ export function WalletSidebar({
     { label: "Assets", href: `${base}/assets`, icon: "$" },
     { label: "Transactions", href: `${base}/transactions`, icon: "◷" },
     { label: "Addresses", href: `${base}/addresses`, icon: "▢" },
+    { label: "Payment Links", href: `${base}/payment-links`, icon: "⎘" },
     { label: "Beneficiaries", href: `${base}/beneficiaries`, icon: "⚇" },
     { label: "Sponsorship", href: `${base}/sponsorship`, icon: "⛽" },
     { label: "Developers", href: `${base}/api`, icon: "›_" },

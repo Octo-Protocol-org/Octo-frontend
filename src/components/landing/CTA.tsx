@@ -13,13 +13,13 @@ export function CTA() {
         <div className="relative mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/signup"
-            className="rounded-full bg-burgundy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-burgundy-bright"
+            className="glass-btn-primary rounded-full px-6 py-3 text-sm font-medium"
           >
             Book demo
           </Link>
           <Link
             href="#developers"
-            className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-white/40"
+            className="glass-btn rounded-full px-6 py-3 text-sm font-medium text-foreground"
           >
             Explore our API docs ↗
           </Link>

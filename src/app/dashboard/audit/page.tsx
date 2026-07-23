@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { listAuditLogs, type AuditLog } from "@/lib/audit";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 const CATEGORIES = [
   { value: "all", label: "All categories" },
@@ -44,9 +45,7 @@ export default function AuditLogsPage() {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 

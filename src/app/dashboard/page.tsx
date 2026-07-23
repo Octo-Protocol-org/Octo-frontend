@@ -9,6 +9,7 @@ import {
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 export default function DashboardHome() {
   const { user, token, loading, logout } = useAuth();
@@ -50,9 +51,7 @@ export default function DashboardHome() {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -85,7 +84,7 @@ export default function DashboardHome() {
           </div>
           <Link
             href="/dashboard/wallets/new"
-            className="rounded-full bg-burgundy px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-burgundy-bright"
+            className="rounded-full glass-btn-primary px-5 py-2.5 text-sm font-medium"
           >
             New Master Wallet
           </Link>
@@ -128,7 +127,7 @@ function EmptyState() {
       </p>
       <Link
         href="/dashboard/wallets/new"
-        className="mt-5 inline-block rounded-full bg-burgundy px-5 py-2.5 text-sm font-medium text-white hover:bg-burgundy-bright"
+        className="mt-5 inline-block rounded-full glass-btn-primary px-5 py-2.5 text-sm font-medium"
       >
         New Master Wallet
       </Link>

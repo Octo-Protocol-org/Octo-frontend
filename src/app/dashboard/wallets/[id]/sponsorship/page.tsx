@@ -12,6 +12,7 @@ import {
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
 import { ApiError } from "@/lib/api";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 export default function SponsorshipSettingsPage({
   params,
@@ -91,9 +92,7 @@ export default function SponsorshipSettingsPage({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -242,7 +241,7 @@ export default function SponsorshipSettingsPage({
                 <button
                   onClick={onSave}
                   disabled={saving}
-                  className="w-full rounded-lg bg-burgundy py-2.5 text-sm font-semibold text-white transition-colors hover:bg-burgundy-bright disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? "Saving…" : "Save settings"}
                 </button>

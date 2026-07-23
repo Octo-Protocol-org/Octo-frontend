@@ -8,30 +8,33 @@ export default function Security() {
       </p>
       <h1 className="mt-2 text-4xl font-semibold text-foreground">Security</h1>
       <p>
-        Octo is custody-adjacent software. The design centers on one rule: the
-        HD seed is encrypted at rest and only ever decrypted in memory, inside a
-        single component, for the instant it takes to sign — then wiped.
+        Octo is <strong>non-custodial</strong>. Each wallet&apos;s private key is
+        generated in your browser (or the SDK), never transmitted to Octo, and
+        never stored on our servers. We build nothing that can move your funds —
+        every transaction is signed on your device.
       </p>
 
       <h2>Key management</h2>
       <ul>
         <li>
-          One HD seed per network, stored <strong>AES-256-GCM encrypted</strong>{" "}
-          with a random nonce and salt. The master key comes from a secret
-          manager, never the database.
+          Keys are generated <strong>client-side</strong> from a BIP-39
+          recovery phrase and derived via <strong>SEP-0005</strong>{" "}
+          (SLIP-0010 ed25519). The mnemonic is shown once at creation — store it
+          out-of-band.
         </li>
         <li>
-          Private keys are <strong>derived on demand</strong> (SEP-0005) and
-          never persisted. The seed is <strong>zeroized</strong> immediately
-          after signing and never written to logs.
+          Your key is backed up as an <strong>opaque blob encrypted under your
+          password</strong> (PBKDF2-SHA256 → AES-256-GCM, in the browser). Octo
+          stores this blob for recovery but <strong>cannot decrypt it</strong> —
+          only your password can, and your password never leaves your device.
         </li>
         <li>
-          The recovery phrase is shown to you once at wallet creation — store it
-          out-of-band; it can recover your funds.
+          Because we never hold your key, a full compromise of Octo&apos;s
+          database and servers <strong>cannot move your funds</strong>.
         </li>
       </ul>
 
-      <h2>Deposits &amp; withdrawals</h2>
+      <h2>Deposits &amp; transactions</h2>
       <ul>
         <li>
           Deposits are credited only when the transaction is{" "}
@@ -40,12 +43,16 @@ export default function Security() {
           or reorg can&apos;t double-credit.
         </li>
         <li>
-          Withdrawals use an <strong>idempotency key</strong> and a state
-          machine, so a retried request can&apos;t double-spend.
+          Outbound transfers are <strong>built and signed on your device</strong>;
+          Octo validates the signed transaction (source must be your wallet;
+          operation-type allowlist) and relays it to the network. It cannot alter
+          or forge a transaction — it has no key to do so.
         </li>
         <li>
-          Octo only ever builds its own payment operations — it never signs
-          caller-supplied raw transactions.
+          <strong>Gas sponsorship</strong> is paid from a per-wallet{" "}
+          <strong>gas tank</strong>: a separate, Octo-held account that holds only
+          fee float. Worst-case exposure there is the gas budget — never customer
+          balances.
         </li>
       </ul>
 
@@ -57,16 +64,17 @@ export default function Security() {
           expose them).
         </li>
         <li>
-          API keys are scoped to a single wallet and cannot withdraw. Regenerate
-          a key anytime to revoke the old one instantly.
+          An API key can relay a transaction you signed, but it{" "}
+          <strong>cannot sign</strong> one — moving funds always requires your
+          key.
         </li>
       </ul>
 
       <Callout type="note">
-        This MVP uses a single encrypted hot seed (not yet MPC/HSM). It is a
-        deliberate, documented tradeoff with a clear upgrade path. Report
-        vulnerabilities responsibly — do not open public issues for security
-        reports.
+        Trade-off of true non-custodial: if you lose <strong>both</strong> your
+        password and your recovery phrase, your funds are unrecoverable — Octo
+        cannot reset them for you. Report vulnerabilities responsibly — do not
+        open public issues for security reports.
       </Callout>
     </Prose>
   );

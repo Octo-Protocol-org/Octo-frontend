@@ -11,6 +11,7 @@ import {
   type ApiKeyInfo,
 } from "@/lib/wallets";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 export default function DevelopersPage({
   params,
@@ -55,9 +56,7 @@ export default function DevelopersPage({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 

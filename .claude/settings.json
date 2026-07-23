@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npm run *)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/api/src/routes/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/api/src/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/**)",
+      "Bash(cargo build *)",
+      "Bash(grep -iE \"HORIZON|horizon\" .env .env.example)",
+      "Bash(curl -s -o /dev/null -w \"issuer account HTTP: %{http_code}\\\\n\" \"https://horizon-testnet.stellar.org/accounts/GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5\")",
+      "Bash(cargo clippy *)",
+      "Bash(echo \"CLIPPY:$?\")",
+      "Bash(cd \"/home/paps/Desktop/Octo/Octo backend\"; grep -rn \"friendbot\\\\|fund\\\\|create_account\\\\|starting_balance\" crates/api/src/routes/wallets.rs crates/api/src/horizon.rs | head)",
+      "Bash(cd \"/home/paps/Desktop/Octo/Octo backend\"; ls crates/store/; ls crates/store/migrations/ 2>/dev/null || find crates/store -name \"*.sql\" | head; echo \"=== models.rs wallet struct ===\"; grep -n \"pub struct Wallet\\\\b\" -A 25 crates/store/src/models.rs | head -40; echo \"=== NewWallet ===\"; grep -n \"pub struct NewWallet\" -A 15 crates/store/src/models.rs)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/store/migrations/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/store/src/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/webhooks/src/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/ingest/src/**)",
+      "Read(//home/paps/Desktop/Octo/Octo backend/crates/wallet-core/src/**)"
+    ],
+    "additionalDirectories": [
+      "/home/paps/Desktop/Octo/Octo backend/crates/api/src",
+      "/home/paps/Desktop/Octo/Octo backend/crates/api/src/routes"
+    ]
+  }
+}

@@ -10,6 +10,7 @@ import {
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { PageSpinner } from "@/components/OctoSpinner";
 
 type WalletSponsorship = {
   wallet: WalletView;
@@ -38,9 +39,7 @@ export default function SponsorshipPage() {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -150,7 +149,7 @@ function EmptyState() {
       </p>
       <Link
         href="/dashboard/wallets/new"
-        className="mt-5 inline-block rounded-lg bg-burgundy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-burgundy-bright"
+        className="mt-5 inline-block rounded-lg glass-btn-primary px-4 py-2 text-sm font-semibold"
       >
         Create master wallet
       </Link>

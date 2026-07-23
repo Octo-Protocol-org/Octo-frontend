@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "./Sidebar";
+import { Parallax } from "@/components/Parallax";
 
 /** Dashboard chrome: test-mode banner, sidebar, topbar, content. */
 export function DashboardShell({
@@ -46,7 +47,11 @@ export function DashboardShell({
             </div>
           </header>
 
-          <main className="flex-1 px-8 py-8">{children}</main>
+          <main className="flex-1 px-8 py-8">
+            <div className="mx-auto w-full max-w-6xl">
+              <Parallax speed={28}>{children}</Parallax>
+            </div>
+          </main>
         </div>
       </div>
     </div>

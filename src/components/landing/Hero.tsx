@@ -25,13 +25,13 @@ export function Hero() {
         <div className="mt-10 flex flex-wrap items-center gap-4">
           <Link
             href="/signup"
-            className="rounded-full bg-burgundy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-burgundy-bright"
+            className="glass-btn-primary rounded-full px-6 py-3 text-sm font-medium"
           >
             Get started for free
           </Link>
           <Link
             href="#demo"
-            className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-white/40"
+            className="glass-btn rounded-full px-6 py-3 text-sm font-medium text-foreground"
           >
             Book demo
           </Link>

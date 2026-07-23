@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken, clearToken, me, type User } from "./auth";
+import { clearLocalBackups } from "./sdk";
+
+/** The page loading spinner shows for at least this long, even if auth resolves faster —
+ * otherwise on a fast connection it flashes for a frame and the animation never registers. */
+const MIN_LOADING_MS = 700;
 
 /** Guard a page: ensures a valid token, returns the user (or null while loading). */
 export function useAuth() {
@@ -10,6 +15,7 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const startedAt = useRef(Date.now());
 
   useEffect(() => {
     const t = getToken();
@@ -26,11 +32,21 @@ export function useAuth() {
         clearToken();
         router.replace("/login");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        const elapsed = Date.now() - startedAt.current;
+        const remaining = MIN_LOADING_MS - elapsed;
+        if (remaining > 0) {
+          setTimeout(() => setLoading(false), remaining);
+        } else {
+          setLoading(false);
+        }
+      });
   }, [router]);
 
   function logout() {
     clearToken();
+    // Remove the locally-cached encrypted key backups; a new login re-fetches from the server.
+    clearLocalBackups();
     router.replace("/login");
   }
 

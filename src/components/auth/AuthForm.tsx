@@ -100,7 +100,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-burgundy py-3 text-sm font-semibold text-white transition-colors hover:bg-burgundy-bright disabled:cursor-not-allowed disabled:opacity-60"
+          className="glass-btn-primary w-full rounded-xl py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Please wait…" : isSignup ? "Continue" : "Sign in"}
         </button>

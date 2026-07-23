@@ -17,7 +17,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full px-4 pt-4">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-full border border-white/10 bg-black/60 px-5 py-2.5 backdrop-blur-md">
+      <nav className="glass mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-2.5">
         <Link href="/" className="flex items-center">
           <Logo />
         </Link>
@@ -46,13 +46,13 @@ export function Navbar() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-full bg-burgundy px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-burgundy-bright"
+            className="glass-btn-primary rounded-full px-4 py-2 text-sm font-medium"
           >
             Get started for free
           </Link>
           <Link
             href="#demo"
-            className="rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-white/40"
+            className="glass-btn rounded-full px-4 py-2 text-sm font-medium text-foreground"
           >
             Book demo
           </Link>
@@ -60,7 +60,7 @@ export function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 md:hidden"
+          className="glass-btn flex h-9 w-9 items-center justify-center rounded-full md:hidden"
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
         >
@@ -70,7 +70,7 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="mx-auto mt-2 max-w-6xl rounded-2xl border border-white/10 bg-black/90 p-4 backdrop-blur-md md:hidden">
+        <div className="glass mx-auto mt-2 max-w-6xl rounded-2xl p-4 md:hidden">
           <ul className="flex flex-col gap-1">
             {NAV_LINKS.map((l) => (
               <li key={l.label}>
@@ -87,13 +87,13 @@ export function Navbar() {
           <div className="mt-3 flex flex-col gap-2">
             <Link
               href="/signup"
-              className="rounded-full bg-burgundy px-4 py-2 text-center text-sm font-medium text-white hover:bg-burgundy-bright"
+              className="glass-btn-primary rounded-full px-4 py-2 text-center text-sm font-medium"
             >
               Get started for free
             </Link>
             <Link
               href="#demo"
-              className="rounded-full border border-white/20 px-4 py-2 text-center text-sm font-medium text-foreground"
+              className="glass-btn rounded-full px-4 py-2 text-center text-sm font-medium text-foreground"
             >
               Book demo
             </Link>
