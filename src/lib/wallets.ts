@@ -47,6 +47,11 @@ export type Transaction = {
   id: string;
   /** "deposit" | "withdrawal". */
   direction: string;
+  /**
+   * The generated address this deposit was attributed to. `null` means the sender used the bare
+   * G... account with no muxed id or memo, so it could not be tied to a customer.
+   */
+  address_id: string | null;
   asset_code: string;
   /** Present for credit assets (e.g. USDC); null for native XLM. */
   asset_issuer: string | null;
@@ -63,15 +68,23 @@ export type Transaction = {
   created_at: string;
 };
 
+/** Fetch a short-lived ownership challenge; sign it with the new keypair before createWallet. */
+export function getWalletChallenge(token: string) {
+  return apiFetch<{ challenge: string }>("/v1/wallets/challenge", { token });
+}
+
 /**
  * Create a non-custodial master wallet. The keypair is generated CLIENT-SIDE (see
  * `@/lib/sdk`); this call registers only the public key and an opaque encrypted backup the
- * server cannot decrypt.
+ * server cannot decrypt. `challenge`/`signature` prove the caller controls the private key
+ * for `publicKey` — without this anyone could register a stranger's account.
  */
 export function createWallet(
   token: string,
   params: {
     publicKey: string;
+    challenge: string;
+    signature: string;
     encryptedBackup?: string;
     label?: string;
     description?: string;
@@ -82,6 +95,8 @@ export function createWallet(
     token,
     body: JSON.stringify({
       public_key: params.publicKey,
+      challenge: params.challenge,
+      signature: params.signature,
       encrypted_backup: params.encryptedBackup ?? null,
       label: params.label || null,
       description: params.description || null,
@@ -111,7 +126,7 @@ export function createGasTank(token: string, id: string) {
  * `undefined` and renders an empty list, which is exactly how a freshly created wallet went
  * missing from the dashboard.
  */
-type Paginated<T> = {
+export type Paginated<T> = {
   data: T[];
   /** Pass as `?before=` to fetch the next page; null when there are no more rows. */
   next_cursor: string | null;
@@ -164,6 +179,50 @@ export async function listTransactions(
     { token },
   );
   return page.data;
+}
+
+/** Options shared by the paginated list helpers. */
+export type PageOpts = {
+  /** Rows per page (backend default 50, max 200). */
+  limit?: number;
+  /** Cursor from the previous page's `next_cursor`; omit for the first page. */
+  before?: string | null;
+};
+
+function pageQuery(opts?: PageOpts): string {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/**
+ * Paginated transactions. Unlike `listTransactions`, this keeps `next_cursor` so the caller can
+ * page forward — the backend has always supported cursors, the UI just discarded them and
+ * silently showed only the first page.
+ */
+export function listTransactionsPage(
+  token: string,
+  id: string,
+  opts?: PageOpts,
+): Promise<Paginated<Transaction>> {
+  return apiFetch<Paginated<Transaction>>(
+    `/v1/wallets/${id}/transactions${pageQuery(opts)}`,
+    { token },
+  );
+}
+
+/** Paginated addresses (see `listTransactionsPage`). */
+export function listAddressesPage(
+  token: string,
+  id: string,
+  opts?: PageOpts,
+): Promise<Paginated<Address>> {
+  return apiFetch<Paginated<Address>>(
+    `/v1/wallets/${id}/addresses${pageQuery(opts)}`,
+    { token },
+  );
 }
 
 /** Format integer stroops as a decimal XLM-style string (7 dp). */

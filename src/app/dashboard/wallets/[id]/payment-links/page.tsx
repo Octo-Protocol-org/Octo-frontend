@@ -1,20 +1,24 @@
 "use client";
 
-import { use, useEffect, useState, type FormEvent } from "react";
+import { use, useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { getWallet, type WalletView } from "@/lib/wallets";
 import {
-  listPaymentLinks,
+  listPaymentLinksPage,
+  listPaymentLinkPayments,
   createPaymentLink,
   setPaymentLinkActive,
   usdcStroopsToAmount,
   usdAmountToStroops,
   type PaymentLink,
+  type PaymentLinkPayment,
 } from "@/lib/payment-links";
+import { uploadImage, validateImage } from "@/lib/uploads";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
@@ -43,32 +47,68 @@ export default function PaymentLinksPage({
   const [selected, setSelected] = useState<PaymentLink | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Cursor pagination: `cursors[i]` is the `before` cursor for page i+1 (page 1 has none).
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    (before: string | null, opts?: { silent?: boolean }) => {
+      if (!token) return;
+      if (!opts?.silent) setRefreshing(true);
+      listPaymentLinksPage(token, id, { before })
+        .then((page) => {
+          setLinks(page.data);
+          setNextCursor(page.next_cursor);
+          setError(null);
+        })
+        .catch((e) => {
+          if (!opts?.silent) {
+            setError(
+              e instanceof Error ? e.message : "Could not load payment links.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!opts?.silent) setRefreshing(false);
+        });
+    },
+    [token, id],
+  );
+
   function refresh() {
-    if (!token) return;
-    setRefreshing(true);
-    listPaymentLinks(token, id)
-      .then(setLinks)
-      .catch(() => {})
-      .finally(() => setRefreshing(false));
+    load(cursors[pageIndex]);
   }
 
   useEffect(() => {
     if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    listPaymentLinks(token, id).then(setLinks).catch(() => setLinks([]));
-  }, [token, id]);
+    getWallet(token, id)
+      .then(setWallet)
+      .catch(() => setWallet(null));
+    load(null);
+  }, [token, id, load]);
 
-  // Silently re-fetch in the background so a just-received payment (collected total, status)
-  // shows up without needing a manual refresh — no loading indicator, only Refresh shows one.
+  // Silently re-fetch so a just-received payment (collected total) shows up without a manual
+  // refresh. Page 1 only — refreshing a deeper page would shift rows under the user.
   useEffect(() => {
-    if (!token) return;
-    const interval = setInterval(() => {
-      listPaymentLinks(token, id)
-        .then(setLinks)
-        .catch(() => {});
-    }, 5000);
+    if (!token || pageIndex !== 0) return;
+    const interval = setInterval(() => load(null, { silent: true }), 5000);
     return () => clearInterval(interval);
-  }, [token, id]);
+  }, [token, pageIndex, load]);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    load(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    load(target);
+  }
 
   async function handleToggleActive(link: PaymentLink) {
     if (!token) return;
@@ -187,6 +227,14 @@ export default function PaymentLinksPage({
                     </table>
                   </div>
                 )}
+                <Pagination
+                  page={pageIndex + 1}
+                  hasPrev={pageIndex > 0}
+                  hasNext={nextCursor !== null}
+                  loading={refreshing}
+                  onPrev={goPrev}
+                  onNext={goNext}
+                />
               </Panel>
             </div>
           </main>
@@ -221,7 +269,12 @@ export default function PaymentLinksPage({
       )}
 
       {selected && (
-        <LinkDetail link={selected} onClose={() => setSelected(null)} />
+        <LinkDetail
+          link={selected}
+          walletId={id}
+          token={token}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
@@ -278,10 +331,47 @@ function LinkRow({
   );
 }
 
-function LinkDetail({ link, onClose }: { link: PaymentLink; onClose: () => void }) {
+function LinkDetail({
+  link,
+  walletId,
+  token,
+  onClose,
+}: {
+  link: PaymentLink;
+  walletId: string;
+  token: string | null;
+  onClose: () => void;
+}) {
+  const [payments, setPayments] = useState<PaymentLinkPayment[] | null>(null);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    listPaymentLinkPayments(token, walletId, link.id, { limit: 20 })
+      .then((page) => {
+        setPayments(page.data);
+        setPaymentsError(null);
+      })
+      .catch((e) =>
+        setPaymentsError(
+          e instanceof Error ? e.message : "Could not load payments.",
+        ),
+      );
+  }, [token, walletId, link.id]);
+
   return (
     <Modal title="Payment link details" onClose={onClose}>
       <div className="space-y-4">
+        {link.image_url && (
+          <div className="flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={link.image_url}
+              alt=""
+              className="h-20 w-20 rounded-lg border border-white/10 object-cover"
+            />
+          </div>
+        )}
         <div className="rounded-lg bg-black/30 p-3 text-center">
           <p className="text-xs text-muted">Collected</p>
           <p className="mt-1 text-xl font-semibold text-foreground">
@@ -308,6 +398,59 @@ function LinkDetail({ link, onClose }: { link: PaymentLink; onClose: () => void 
         {link.description && (
           <p className="text-center text-sm text-muted">{link.description}</p>
         )}
+
+        <div>
+          <p className="text-xs font-medium text-foreground">Payments</p>
+          {paymentsError ? (
+            <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+              {paymentsError}
+            </p>
+          ) : payments === null ? (
+            <p className="mt-2 text-xs text-muted">Loading…</p>
+          ) : payments.length === 0 ? (
+            <p className="mt-2 text-xs text-muted">
+              No payments yet. Payers appear here as soon as they start a payment.
+            </p>
+          ) : (
+            <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-white/10">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-burgundy-soft/60">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted">
+                    <th className="px-3 py-2 font-medium">Payer</th>
+                    <th className="px-3 py-2 font-medium">Amount</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-3 py-2">
+                        <p className="text-foreground">{p.payer_name ?? "—"}</p>
+                        {p.payer_email && (
+                          <p className="text-[10px] text-muted">{p.payer_email}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-medium text-foreground">
+                        ${usdcStroopsToAmount(p.amount_usdc_stroops)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            p.status === "confirmed"
+                              ? "text-emerald-400"
+                              : "text-amber-400"
+                          }
+                        >
+                          {p.status === "confirmed" ? "✓ Confirmed" : "• Pending"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   );
@@ -331,7 +474,28 @@ function CreateLinkModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !token) return;
+    const invalid = validateImage(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      setImageUrl(await uploadImage(token, file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -348,6 +512,7 @@ function CreateLinkModal({
       const link = await createPaymentLink(token, walletId, {
         name: name.trim(),
         description: description.trim() || undefined,
+        imageUrl: imageUrl ?? undefined,
         amountUsdcStroops: amountUsdcStroops ?? undefined,
       });
       onCreated(link);
@@ -361,6 +526,37 @@ function CreateLinkModal({
   return (
     <Modal title="Create payment link" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium text-foreground">
+            Image (optional)
+          </label>
+          <div className="mt-1 flex items-center gap-3">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30">
+              {imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-lg text-muted">🖼</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={uploading}
+                className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-white/10 file:bg-white/[0.03] file:px-3 file:py-1.5 file:text-xs file:text-foreground hover:file:border-burgundy/50"
+              />
+              <p className="mt-1 text-[11px] text-muted">
+                {uploading
+                  ? "Uploading…"
+                  : imageUrl
+                    ? "Uploaded. Choose another file to replace it."
+                    : "PNG or JPG, up to 2MB."}
+              </p>
+            </div>
+          </div>
+        </div>
         <div>
           <label className="text-sm font-medium text-foreground">Name</label>
           <input
@@ -411,7 +607,7 @@ function CreateLinkModal({
           </button>
           <ActionButton
             label={creating ? "Creating…" : "Create Link"}
-            disabled={!name.trim() || creating}
+            disabled={!name.trim() || creating || uploading}
             loading={creating}
           />
         </div>

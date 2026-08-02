@@ -1,11 +1,11 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import {
   getWallet,
-  listTransactions,
+  listTransactionsPage,
   stroopsToAmount,
   displayAssetCode,
   type WalletView,
@@ -14,6 +14,7 @@ import {
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
@@ -33,33 +34,73 @@ export default function TransactionsPage({
   const [refreshing, setRefreshing] = useState(false);
   const [assetFilter, setAssetFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Cursor pagination: `cursors[i]` is the `before` cursor for page i+1 (page 1 has none), so
+  // Prev is just a pop. The API has no offsets, so pages can only be walked in order.
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    (before: string | null, opts?: { silent?: boolean }) => {
+      if (!token) return;
+      if (!opts?.silent) setRefreshing(true);
+      listTransactionsPage(token, id, { before })
+        .then((page) => {
+          setTxns(page.data);
+          setNextCursor(page.next_cursor);
+          setError(null);
+        })
+        .catch((e) => {
+          // A silent background refresh failing is not worth interrupting the user over; an
+          // explicit action failing is.
+          if (!opts?.silent) {
+            setError(
+              e instanceof Error ? e.message : "Could not load transactions.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!opts?.silent) setRefreshing(false);
+        });
+    },
+    [token, id],
+  );
 
   function refresh() {
-    if (!token) return;
-    setRefreshing(true);
-    listTransactions(token, id)
-      .then(setTxns)
-      .catch(() => {})
-      .finally(() => setRefreshing(false));
+    load(cursors[pageIndex]);
   }
 
   useEffect(() => {
     if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    listTransactions(token, id).then(setTxns).catch(() => setTxns([]));
-  }, [token, id]);
+    getWallet(token, id)
+      .then(setWallet)
+      .catch(() => setWallet(null));
+    load(null);
+  }, [token, id, load]);
 
   // Silently re-fetch in the background so a deposit (e.g. from a payment link) shows up without
-  // needing a manual refresh — no loading indicator here, only the explicit Refresh button shows one.
+  // needing a manual refresh. Only page 1 auto-refreshes — re-fetching a deeper page would fight
+  // the user as rows shift underneath them.
   useEffect(() => {
-    if (!token) return;
-    const interval = setInterval(() => {
-      listTransactions(token, id)
-        .then(setTxns)
-        .catch(() => {});
-    }, 5000);
+    if (!token || pageIndex !== 0) return;
+    const interval = setInterval(() => load(null, { silent: true }), 5000);
     return () => clearInterval(interval);
-  }, [token, id]);
+  }, [token, pageIndex, load]);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    load(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    load(target);
+  }
 
   // Tabs are per-asset (not per-status or per-op-type, which don't exist on Stellar the way
   // they do on an EVM chain): "All" plus one tab per distinct asset code this wallet has ever
@@ -75,6 +116,11 @@ export default function TransactionsPage({
   const totalDeposits = txns.filter((t) => t.direction === "deposit").length;
   const totalWithdrawals = txns.filter((t) => t.direction === "withdrawal").length;
   const failedCount = txns.filter((t) => t.status === "failed").length;
+  // Deposits the sender made to the bare G... account with no muxed id or memo — real money,
+  // but not tied to any customer address, so it is invisible in per-address reporting.
+  const unattributedCount = txns.filter(
+    (t) => t.direction === "deposit" && t.address_id === null,
+  ).length;
 
   if (loading || !user) {
     return (
@@ -121,14 +167,25 @@ export default function TransactionsPage({
             </div>
 
             {/* stat cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Stat label="Total transactions" value={String(txns.length)} />
+            {/* These count the CURRENT page only — the API is cursor-paginated and returns no
+                total, so labelling them "total" would be wrong as soon as there are 2+ pages. */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+              <Stat
+                label="On this page"
+                value={String(txns.length)}
+                sub={pageIndex > 0 || nextCursor ? `Page ${pageIndex + 1}` : undefined}
+              />
               <Stat label="Deposits" value={String(totalDeposits)} />
               <Stat label="Withdrawals" value={String(totalWithdrawals)} />
               <Stat
                 label="Failed"
                 value={String(failedCount)}
                 sub={failedCount > 0 ? "Rejected on-chain" : undefined}
+              />
+              <Stat
+                label="Unattributed"
+                value={String(unattributedCount)}
+                sub={unattributedCount > 0 ? "No customer address" : undefined}
               />
             </div>
 
@@ -155,6 +212,12 @@ export default function TransactionsPage({
                 loading={refreshing}
               />
             </div>
+
+            {error && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {error}
+              </p>
+            )}
 
             <Panel title={`${filtered.length} transaction${filtered.length === 1 ? "" : "s"}`}>
               {filtered.length === 0 ? (
@@ -184,6 +247,14 @@ export default function TransactionsPage({
                   </table>
                 </div>
               )}
+              <Pagination
+                page={pageIndex + 1}
+                hasPrev={pageIndex > 0}
+                hasNext={nextCursor !== null}
+                loading={refreshing}
+                onPrev={goPrev}
+                onNext={goNext}
+              />
             </Panel>
           </div>
           </main>
@@ -205,6 +276,7 @@ function TxRow({
   onSelect: () => void;
 }) {
   const isDeposit = tx.direction === "deposit";
+  const isUnattributed = isDeposit && tx.address_id === null;
   const counterparty = isDeposit ? tx.source_account : tx.destination_account;
 
   return (
@@ -213,15 +285,25 @@ function TxRow({
       className="cursor-pointer transition-colors hover:bg-white/[0.02]"
     >
       <td className="py-3 pr-4">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${
-            isDeposit
-              ? "bg-emerald-500/10 text-emerald-400"
-              : "bg-burgundy/20 text-burgundy-bright"
-          }`}
-        >
-          {isDeposit ? "↓ Deposit" : "↑ Withdrawal"}
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${
+              isDeposit
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-burgundy/20 text-burgundy-bright"
+            }`}
+          >
+            {isDeposit ? "↓ Deposit" : "↑ Withdrawal"}
+          </span>
+          {isUnattributed && (
+            <span
+              className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400"
+              title="Sent to the base G... address with no muxed id or memo, so it could not be tied to a customer address."
+            >
+              Unattributed
+            </span>
+          )}
+        </div>
       </td>
       <td className="py-3 pr-4 font-medium text-foreground">
         {isDeposit ? "+" : "-"}
@@ -293,6 +375,13 @@ function TransactionDetail({
             {stroopsToAmount(tx.amount_stroops)} {displayAssetCode(tx.asset_code)}
           </p>
         </div>
+
+        {isDeposit && tx.address_id === null && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            Unattributed deposit — the sender paid the base account directly without a muxed
+            address or memo id, so it could not be matched to a customer address.
+          </p>
+        )}
 
         {tx.asset_issuer && <CopyField label="Asset issuer" value={tx.asset_issuer} />}
         {tx.source_account && <CopyField label="Source account" value={tx.source_account} />}

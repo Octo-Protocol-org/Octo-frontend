@@ -33,6 +33,50 @@ export async function listPaymentLinks(
   return page.data;
 }
 
+/** Paginated payment links, preserving `next_cursor` for page controls. */
+export function listPaymentLinksPage(
+  token: string,
+  walletId: string,
+  opts?: { limit?: number; before?: string | null },
+): Promise<{ data: PaymentLink[]; next_cursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const qs = params.toString();
+  return apiFetch<{ data: PaymentLink[]; next_cursor: string | null }>(
+    `/v1/wallets/${walletId}/payment-links${qs ? `?${qs}` : ""}`,
+    { token },
+  );
+}
+
+/** One payment recorded against a link. Owner-only: carries payer name/email. */
+export type PaymentLinkPayment = {
+  id: string;
+  payer_name: string | null;
+  payer_email: string | null;
+  amount_usdc_stroops: number;
+  /** "pending" | "confirmed". */
+  status: string;
+  transaction_id: string | null;
+  created_at: string;
+};
+
+export function listPaymentLinkPayments(
+  token: string,
+  walletId: string,
+  linkId: string,
+  opts?: { limit?: number; before?: string | null },
+): Promise<{ data: PaymentLinkPayment[]; next_cursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.before) params.set("before", opts.before);
+  const qs = params.toString();
+  return apiFetch<{ data: PaymentLinkPayment[]; next_cursor: string | null }>(
+    `/v1/wallets/${walletId}/payment-links/${linkId}/payments${qs ? `?${qs}` : ""}`,
+    { token },
+  );
+}
+
 export function createPaymentLink(
   token: string,
   walletId: string,
@@ -144,11 +188,23 @@ export type SubmitPaymentResult = {
   detail: string | null;
 };
 
-/** Relay a payer-signed (e.g. Freighter) payment transaction to this link's deposit address. */
-export function submitPublicPayment(slug: string, transactionXdr: string) {
+/**
+ * Relay a payer-signed (e.g. Freighter) payment to this payment's deposit address.
+ *
+ * `paymentId` identifies the intent being paid: each intent has its own muxed address, and the
+ * server validates the transaction's destination against that address.
+ */
+export function submitPublicPayment(
+  slug: string,
+  transactionXdr: string,
+  paymentId: string,
+) {
   return apiFetch<SubmitPaymentResult>(`/v1/pay/${slug}/submit-signed`, {
     method: "POST",
-    body: JSON.stringify({ transaction_xdr: transactionXdr }),
+    body: JSON.stringify({
+      transaction_xdr: transactionXdr,
+      payment_id: paymentId,
+    }),
   });
 }
 
