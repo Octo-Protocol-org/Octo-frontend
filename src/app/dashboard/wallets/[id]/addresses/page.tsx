@@ -39,15 +39,28 @@ export default function AddressesPage({
     if (!token) return;
     setRefreshing(true);
     listAddresses(token, id)
-      .then(setAddresses)
-      .catch(() => {})
+      .then((a) => {
+        setAddresses(a);
+        setError(null);
+      })
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Could not load addresses."),
+      )
       .finally(() => setRefreshing(false));
   }
 
   useEffect(() => {
     if (!token) return;
     getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    listAddresses(token, id).then(setAddresses).catch(() => setAddresses([]));
+    listAddresses(token, id)
+      .then((a) => {
+        setAddresses(a);
+        setError(null);
+      })
+      .catch((e) => {
+        setAddresses([]);
+        setError(e instanceof Error ? e.message : "Could not load addresses.");
+      });
   }, [token, id]);
 
   async function handleNewAddress() {

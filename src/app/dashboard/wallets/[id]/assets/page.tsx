@@ -30,20 +30,36 @@ export default function AssetsPage({
   const [balances, setBalances] = useState<Balance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showUsd, setShowUsd] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     if (!token) return;
     setRefreshing(true);
     getBalances(token, id)
-      .then(setBalances)
-      .catch(() => {})
+      .then((b) => {
+        setBalances(b);
+        setError(null);
+      })
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Could not load balances."),
+      )
       .finally(() => setRefreshing(false));
   }
 
   useEffect(() => {
     if (!token) return;
     getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    getBalances(token, id).then(setBalances).catch(() => setBalances([]));
+    getBalances(token, id)
+      .then((b) => {
+        setBalances(b);
+        setError(null);
+      })
+      .catch((e) => {
+        setBalances([]);
+        // Without this the page shows "no assets", which looks like an empty wallet rather
+        // than a failed request.
+        setError(e instanceof Error ? e.message : "Could not load balances.");
+      });
   }, [token, id]);
 
   if (loading || !user) {
@@ -116,6 +132,12 @@ export default function AssetsPage({
               />
               <Stat label="Reserve" value="1.0 XLM" sub="Base account reserve" />
             </div>
+
+            {error && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {error}
+              </p>
+            )}
 
             <div className="flex flex-wrap gap-3">
               <ActionButton

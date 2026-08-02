@@ -24,9 +24,16 @@ function apiOrigin(): string {
   }
 }
 
+// Payment-link images are uploaded straight from the browser to Cloudinary (the API only signs
+// the request) and then served from Cloudinary's CDN, so both origins must be allowed. These are
+// two specific hosts rather than a wildcard — no other third-party origin is permitted.
+const CLOUDINARY_UPLOAD = "https://api.cloudinary.com";
+const CLOUDINARY_CDN = "https://res.cloudinary.com";
+
 export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
-  const connect = `connect-src 'self' ${apiOrigin()}${isDev ? " ws: http://localhost:*" : ""}`;
+  const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
+  const img = `img-src 'self' blob: data: ${CLOUDINARY_CDN}`;
 
   // The signing surface (dashboard) handles decrypted keys, so it gets a strict, nonce-based CSP
   // with no `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each
@@ -52,7 +59,7 @@ export function proxy(request: NextRequest) {
       `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
       // Inline styles can't exfiltrate secrets the way scripts can — a limited, deliberate relax.
       `style-src 'self' 'unsafe-inline'`,
-      `img-src 'self' blob: data:`,
+      img,
       `font-src 'self'`,
       connect,
       `object-src 'none'`,
@@ -70,7 +77,7 @@ export function proxy(request: NextRequest) {
       `default-src 'self'`,
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
       `style-src 'self' 'unsafe-inline'`,
-      `img-src 'self' blob: data:`,
+      img,
       `font-src 'self'`,
       connect,
       `object-src 'none'`,

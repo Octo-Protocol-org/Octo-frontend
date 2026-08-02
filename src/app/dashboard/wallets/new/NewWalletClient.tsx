@@ -4,7 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
-import { createWallet, type CreateWalletResponse } from "@/lib/wallets";
+import {
+  createWallet,
+  getWalletChallenge,
+  type CreateWalletResponse,
+} from "@/lib/wallets";
 import { ApiError } from "@/lib/api";
 import {
   generateWallet,
@@ -59,9 +63,16 @@ export function NewWalletClient() {
       // 2. Encrypt the mnemonic under the user's password (server can never decrypt it).
       const backup = await encryptSeed(keys.mnemonic, password);
       const encryptedBackup = serializeBackup(backup);
-      // 3. Register only the public key + opaque backup blob.
+      // 3. Prove ownership: sign the server's challenge with the new keypair.
+      const { challenge } = await getWalletChallenge(token);
+      const signature = keys.keypair
+        .sign(Buffer.from(challenge, "utf8"))
+        .toString("base64");
+      // 4. Register only the public key + signed challenge + opaque backup blob.
       const wallet = await createWallet(token, {
         publicKey: keys.publicKey,
+        challenge,
+        signature,
         encryptedBackup,
         label: name,
         description,

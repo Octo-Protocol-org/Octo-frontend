@@ -163,7 +163,7 @@ export default function PayPage({
         throw new Error("Freighter did not return a signed transaction.");
       }
 
-      const result = await submitPublicPayment(slug, signed.signedTxXdr);
+      const result = await submitPublicPayment(slug, signed.signedTxXdr, intent.payment_id);
       if (result.status !== "confirmed") {
         throw new Error(
           result.detail?.includes("no_trust")
