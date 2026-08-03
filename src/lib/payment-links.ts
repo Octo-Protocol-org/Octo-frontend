@@ -164,9 +164,12 @@ export function createPaymentIntent(
 }
 
 export type PaymentStatus = {
-  /** "pending" | "confirmed". */
+  /** "pending" | "confirmed" | "expired" | "underpaid" | "overpaid". */
   status: string;
   transaction_id: string | null;
+  expected_usdc_stroops: number;
+  /** What actually landed on-chain, once a deposit has been matched. */
+  received_usdc_stroops: number | null;
 };
 
 export function getPaymentStatus(slug: string, paymentId: string) {
@@ -224,4 +227,9 @@ export function usdAmountToStroops(usd: string): number | null {
   const n = Number(usd);
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.round(n * 10_000_000);
+}
+
+/** Basic shape check (not full RFC 5322) — enough to catch typos before submitting. */
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
