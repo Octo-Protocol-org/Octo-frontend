@@ -9,7 +9,7 @@ const CASES = [
   },
   {
     title: "Treasury & payouts",
-    body: "Hold balances in one master wallet per chain and disburse payouts programmatically with idempotent, signed withdrawals.",
+    body: "Hold balances in one master wallet on Stellar today, with more chains on the roadmap, and disburse payouts programmatically — signed client-side, relayed through one API.",
   },
   {
     title: "Gas sponsorship",

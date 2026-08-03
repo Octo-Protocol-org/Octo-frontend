@@ -6,8 +6,8 @@ const FEATURES = [
   },
   {
     title: "Instant\nWithdrawals",
-    body: "Sign and submit payouts from your master wallet through one API, with idempotency keys that make double-spends impossible.",
-    log: ["Withdrawal signed", "Submitted to Stellar", "Confirmed on-chain"],
+    body: "Sign payouts client-side and relay them through one API — your keys never touch our servers, and Stellar's own sequence numbers rule out double-spends.",
+    log: ["Payout signed client-side", "Relayed to Stellar", "Confirmed on-chain"],
   },
   {
     title: "Real-time\nDeposit Tracking",
