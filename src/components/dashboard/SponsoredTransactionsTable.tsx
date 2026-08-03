@@ -6,6 +6,7 @@ import {
   type SponsoredTransaction,
 } from "@/lib/sponsorship";
 import { stroopsToAmount } from "@/lib/wallets";
+import { CopyButton } from "@/components/CopyButton";
 
 const STATUS_BADGE: Record<string, string> = {
   confirmed: "bg-emerald-500/15 text-emerald-400",
@@ -138,8 +139,6 @@ export function SponsoredTransactionsTable({
 }
 
 function HashCell({ hash }: { hash: string | null }) {
-  const [copied, setCopied] = useState(false);
-
   if (!hash) return <span className="text-muted">—</span>;
 
   return (
@@ -147,19 +146,8 @@ function HashCell({ hash }: { hash: string | null }) {
       <span className="font-mono text-xs text-foreground">
         {`${hash.slice(0, 6)}…${hash.slice(-6)}`}
       </span>
-      <button
-        onClick={() => {
-          // Always copy the full hash, not the truncated display value.
-          navigator.clipboard.writeText(hash);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-        className="text-muted hover:text-foreground"
-        title="Copy full hash"
-        aria-label="Copy full transaction hash"
-      >
-        {copied ? "✓" : "⧉"}
-      </button>
+      {/* Always copies the full hash, not the truncated display value. */}
+      <CopyButton value={hash} label="Copy full hash" />
     </span>
   );
 }

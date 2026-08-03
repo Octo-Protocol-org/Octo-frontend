@@ -2,6 +2,7 @@
 
 import { Sidebar } from "./Sidebar";
 import { Parallax } from "@/components/Parallax";
+import { DashboardBackground } from "./DashboardBackground";
 
 /** Dashboard chrome: test-mode banner, sidebar, topbar, content. */
 export function DashboardShell({
@@ -16,14 +17,16 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="relative flex min-h-screen flex-col bg-background">
+      <DashboardBackground />
+
       {/* test-mode banner */}
-      <div className="bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
+      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
         You are currently on <strong>test mode</strong> (Stellar testnet).
         Mainnet support is coming soon.
       </div>
 
-      <div className="flex flex-1">
+      <div className="relative z-10 flex flex-1">
         <Sidebar email={email} />
 
         <div className="flex flex-1 flex-col">

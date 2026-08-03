@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { CopyButton } from "@/components/CopyButton";
 import {
   getPublicPaymentLink,
   createPaymentIntent,
@@ -310,13 +311,10 @@ export default function PayPage({
                   <span className="flex-1 truncate font-mono text-xs text-gray-900">
                     {intent.deposit_address}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(intent.deposit_address)}
-                    className="shrink-0 text-xs text-gray-500 hover:text-gray-900"
-                  >
-                    Copy
-                  </button>
+                  <CopyButton
+                    value={intent.deposit_address}
+                    className="text-xs text-gray-500 hover:text-gray-900"
+                  />
                 </div>
                 <button
                   type="button"

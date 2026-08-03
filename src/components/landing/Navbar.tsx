@@ -17,7 +17,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full px-4 pt-4">
-      <nav className="glass mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-2.5">
+      <nav className="glass-nav mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-2.5">
         <Link href="/" className="flex items-center">
           <Logo />
         </Link>
@@ -70,7 +70,7 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="glass mx-auto mt-2 max-w-6xl rounded-2xl p-4 md:hidden">
+        <div className="glass-nav mx-auto mt-2 max-w-6xl rounded-2xl p-4 md:hidden">
           <ul className="flex flex-col gap-1">
             {NAV_LINKS.map((l) => (
               <li key={l.label}>

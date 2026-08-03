@@ -1,5 +1,7 @@
 "use client";
 
+import { CopyButton } from "@/components/CopyButton";
+
 export function Modal({
   title,
   onClose,
@@ -40,13 +42,7 @@ export function CopyField({ label, value }: { label: string; value: string }) {
         <span className="flex-1 truncate font-mono text-xs text-foreground">
           {value}
         </span>
-        <button
-          onClick={() => navigator.clipboard.writeText(value)}
-          className="shrink-0 text-muted hover:text-foreground"
-          title="Copy"
-        >
-          ⧉
-        </button>
+        <CopyButton value={value} />
       </div>
     </div>
   );
