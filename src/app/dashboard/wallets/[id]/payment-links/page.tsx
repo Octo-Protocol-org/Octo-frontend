@@ -266,7 +266,7 @@ export default function PaymentLinksPage({
               Share this link with your customers — anyone with it can pay, no Octo
               account required.
             </p>
-            <CopyField label="Payment link" value={payUrl(created.slug)} />
+            <CopyField label="Payment link" value={created.url ?? payUrl(created.slug)} />
           </div>
         </Modal>
       )}
@@ -381,7 +381,7 @@ function LinkDetail({
             ${usdcStroopsToAmount(link.collected_usdc_stroops)}
           </p>
         </div>
-        <CopyField label="Public link" value={payUrl(link.slug)} />
+        <CopyField label="Public link" value={link.url ?? payUrl(link.slug)} />
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-lg bg-black/30 p-3">
             <p className="text-muted">Amount</p>
@@ -477,6 +477,7 @@ function CreateLinkModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -516,6 +517,7 @@ function CreateLinkModal({
         name: name.trim(),
         description: description.trim() || undefined,
         imageUrl: imageUrl ?? undefined,
+        redirectUrl: redirectUrl.trim() || undefined,
         amountUsdcStroops: amountUsdcStroops ?? undefined,
       });
       onCreated(link);
@@ -591,6 +593,20 @@ function CreateLinkModal({
           />
           <p className="mt-1 text-[11px] text-muted">
             Settled 1:1 in USDC. Leave empty to let the payer choose their own amount.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-foreground">
+            Redirect URL (optional)
+          </label>
+          <input
+            value={redirectUrl}
+            onChange={(e) => setRedirectUrl(e.target.value)}
+            placeholder="https://your-site.com/thank-you"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Where to send customers after a successful payment.
           </p>
         </div>
 
