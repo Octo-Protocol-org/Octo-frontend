@@ -16,6 +16,7 @@ import {
 } from "@/lib/payment-links";
 import { uploadImage, validateImage } from "@/lib/uploads";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
@@ -132,11 +133,13 @@ export default function PaymentLinksPage({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
+    <div className="relative flex min-h-screen flex-col bg-background">
+      <DashboardBackground />
+
+      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
         You are currently on <strong>test mode</strong> (Stellar testnet).
       </div>
-      <div className="flex flex-1">
+      <div className="relative z-10 flex flex-1">
         <WalletSidebar
           walletId={id}
           walletName={wallet?.label ?? "Master wallet"}

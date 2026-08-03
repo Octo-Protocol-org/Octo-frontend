@@ -11,6 +11,7 @@ import {
   type Balance,
 } from "@/lib/wallets";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
 
@@ -72,11 +73,13 @@ export default function AssetsPage({
   const credits = balances.filter((b) => b.asset_type !== "native");
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
+    <div className="relative flex min-h-screen flex-col bg-background">
+      <DashboardBackground />
+
+      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
         You are currently on <strong>test mode</strong> (Stellar testnet).
       </div>
-      <div className="flex flex-1">
+      <div className="relative z-10 flex flex-1">
         <WalletSidebar
           walletId={id}
           walletName={wallet?.label ?? "Master wallet"}
