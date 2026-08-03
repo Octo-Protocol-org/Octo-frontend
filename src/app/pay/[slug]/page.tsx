@@ -28,6 +28,22 @@ function celebrate() {
   confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 } });
 }
 
+// Sends the payer back to the merchant's site after a short delay, so they still see the
+// confirmed/confetti state. Fails open (no redirect) on a malformed redirect_url.
+function redirectAfterConfirm(redirectUrl: string, paymentId: string, slugValue: string) {
+  try {
+    const url = new URL(redirectUrl);
+    url.searchParams.set("status", "success");
+    url.searchParams.set("payment_id", paymentId);
+    url.searchParams.set("slug", slugValue);
+    setTimeout(() => {
+      window.location.href = url.toString();
+    }, 2000);
+  } catch {
+    // malformed redirect_url — stay on the confirmed page
+  }
+}
+
 export default function PayPage({
   params,
 }: {
@@ -78,6 +94,9 @@ export default function PayPage({
         if (status.status === "confirmed") {
           setStep("confirmed");
           celebrate();
+          if (link?.redirect_url) {
+            redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
+          }
           if (pollRef.current) clearInterval(pollRef.current);
         }
       } catch {
@@ -87,7 +106,7 @@ export default function PayPage({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [intent, step, slug]);
+  }, [intent, step, slug, link]);
 
   async function handleCheckPayment() {
     if (!intent) return;
@@ -98,6 +117,9 @@ export default function PayPage({
       if (status.status === "confirmed") {
         setStep("confirmed");
         celebrate();
+        if (link?.redirect_url) {
+          redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
+        }
       } else {
         setCheckMessage(
           "Not received yet — deposits can take a little while to be detected. This page will update automatically once it lands.",
@@ -174,6 +196,9 @@ export default function PayPage({
       }
       setStep("confirmed");
       celebrate();
+      if (link?.redirect_url) {
+        redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Freighter payment failed.");
     } finally {
@@ -365,6 +390,9 @@ export default function PayPage({
                 Thank you{payerName ? `, ${payerName}` : ""} — your payment has been
                 confirmed on-chain.
               </p>
+              {link?.redirect_url && (
+                <p className="mt-4 text-[11px] text-gray-400">Redirecting you back…</p>
+              )}
             </div>
           )}
         </div>

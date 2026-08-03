@@ -10,11 +10,14 @@ export type PaymentLink = {
   name: string;
   description: string | null;
   image_url: string | null;
+  redirect_url: string | null;
   /** null means flexible: the payer chooses the amount. */
   amount_usdc_stroops: number | null;
   active: boolean;
   collected_usdc_stroops: number;
   created_at: string;
+  /** Full hosted checkout URL, e.g. `https://app.octo.dev/pay/ab12cd34ef`. */
+  url: string;
 };
 
 type Paginated<T> = {
@@ -84,6 +87,7 @@ export function createPaymentLink(
     name: string;
     description?: string;
     imageUrl?: string;
+    redirectUrl?: string;
     amountUsdcStroops?: number;
   },
 ) {
@@ -94,6 +98,7 @@ export function createPaymentLink(
       name: params.name,
       description: params.description || null,
       image_url: params.imageUrl || null,
+      redirect_url: params.redirectUrl || null,
       amount_usdc_stroops: params.amountUsdcStroops ?? null,
     }),
   });
@@ -128,6 +133,7 @@ export type PublicPaymentLink = {
   name: string;
   description: string | null;
   image_url: string | null;
+  redirect_url: string | null;
   amount_usdc_stroops: number | null;
   deposit_address: string;
   asset_code: string;

@@ -29,6 +29,7 @@ const SECTIONS: { title: string; links: DocLink[] }[] = [
       { label: "Addresses", href: "/docs/api/addresses" },
       { label: "Balances & Transactions", href: "/docs/api/reads" },
       { label: "Withdrawals", href: "/docs/api/withdrawals" },
+      { label: "Payment Links (Checkout)", href: "/docs/checkout" },
     ],
   },
   {
