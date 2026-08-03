@@ -11,8 +11,10 @@ import {
   submitPublicPayment,
   usdcStroopsToAmount,
   usdAmountToStroops,
+  isValidEmail,
   type PublicPaymentLink,
   type PaymentIntent,
+  type PaymentStatus,
 } from "@/lib/payment-links";
 import { USDC_TESTNET } from "@/lib/wallets";
 import { buildUnsignedPayment } from "@/lib/sdk";
@@ -28,8 +30,7 @@ function celebrate() {
   confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 } });
 }
 
-// Sends the payer back to the merchant's site after a short delay, so they still see the
-// confirmed/confetti state. Fails open (no redirect) on a malformed redirect_url.
+// Sends the payer back to the merchant's site after a short delay; fails open on a bad URL.
 function redirectAfterConfirm(redirectUrl: string, paymentId: string, slugValue: string) {
   try {
     const url = new URL(redirectUrl);
@@ -62,6 +63,8 @@ export default function PayPage({
   const [freighterBusy, setFreighterBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkMessage, setCheckMessage] = useState<string | null>(null);
+  // Set only for a resolved-but-not-successful status (expired/underpaid/overpaid).
+  const [resolvedStatus, setResolvedStatus] = useState<PaymentStatus | null>(null);
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -84,20 +87,32 @@ export default function PayPage({
       .catch(() => finish("not-found"));
   }, [slug]);
 
-  // Poll for confirmation once an intent has a deposit address to watch.
+  // Handles any status response; returns true once resolved (confirmed or otherwise final).
+  function applyStatus(status: PaymentStatus): boolean {
+    if (status.status === "confirmed") {
+      setStep("confirmed");
+      celebrate();
+      if (link?.redirect_url && intent) {
+        redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
+      }
+      return true;
+    }
+    if (status.status === "expired" || status.status === "underpaid" || status.status === "overpaid") {
+      setResolvedStatus(status);
+      return true;
+    }
+    return false;
+  }
+
+  // Polls for confirmation once an intent has a deposit address to watch.
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (!intent || step !== "pay") return;
     pollRef.current = setInterval(async () => {
       try {
         const status = await getPaymentStatus(slug, intent.payment_id);
-        if (status.status === "confirmed") {
-          setStep("confirmed");
-          celebrate();
-          if (link?.redirect_url) {
-            redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
-          }
-          if (pollRef.current) clearInterval(pollRef.current);
+        if (applyStatus(status) && pollRef.current) {
+          clearInterval(pollRef.current);
         }
       } catch {
         // transient — keep polling
@@ -106,6 +121,7 @@ export default function PayPage({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent, step, slug, link]);
 
   async function handleCheckPayment() {
@@ -114,13 +130,7 @@ export default function PayPage({
     setCheckMessage(null);
     try {
       const status = await getPaymentStatus(slug, intent.payment_id);
-      if (status.status === "confirmed") {
-        setStep("confirmed");
-        celebrate();
-        if (link?.redirect_url) {
-          redirectAfterConfirm(link.redirect_url, intent.payment_id, slug);
-        }
-      } else {
+      if (!applyStatus(status)) {
         setCheckMessage(
           "Not received yet — deposits can take a little while to be detected. This page will update automatically once it lands.",
         );
@@ -135,9 +145,25 @@ export default function PayPage({
   async function handleContinue(e: React.FormEvent) {
     e.preventDefault();
     if (!link) return;
+    // Reuse the existing intent if the payer went Back and forward again.
+    if (intent) {
+      setStep("pay");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
+      // Name and email are required — a payer's identity must be collectible before they pay.
+      if (!payerName.trim() || !payerEmail.trim()) {
+        setError("Enter your name and email address.");
+        setSubmitting(false);
+        return;
+      }
+      if (!isValidEmail(payerEmail.trim())) {
+        setError("Enter a valid email address.");
+        setSubmitting(false);
+        return;
+      }
       const amountUsdcStroops =
         link.amount_usdc_stroops ?? usdAmountToStroops(amount);
       if (amountUsdcStroops === null) {
@@ -285,6 +311,7 @@ export default function PayPage({
                     value={payerName}
                     onChange={(e) => setPayerName(e.target.value)}
                     placeholder="Full name"
+                    required
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-black"
                   />
                   <input
@@ -292,6 +319,7 @@ export default function PayPage({
                     onChange={(e) => setPayerEmail(e.target.value)}
                     placeholder="Email address"
                     type="email"
+                    required
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-black"
                   />
                 </div>
@@ -316,9 +344,30 @@ export default function PayPage({
             </form>
           )}
 
-          {step === "pay" && intent && (
+          {step === "pay" && intent && resolvedStatus && (
+            <MismatchBanner
+              status={resolvedStatus}
+              onBack={() => {
+                // The old intent is permanently resolved — starting over needs a fresh one.
+                setResolvedStatus(null);
+                setIntent(null);
+                setStep("form");
+              }}
+            />
+          )}
+
+          {step === "pay" && intent && !resolvedStatus && (
             <div className="space-y-5">
-              <StepHeader current="Payment Method" />
+              <div className="flex items-center justify-between">
+                <StepHeader current="Payment Method" />
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  className="text-xs font-medium text-gray-500 hover:text-gray-900"
+                >
+                  ‹ Back
+                </button>
+              </div>
 
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="text-xs text-gray-500">Amount</p>
@@ -433,6 +482,44 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="text-sm font-medium text-gray-900">{label}</label>
       <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+function MismatchBanner({
+  status,
+  onBack,
+}: {
+  status: PaymentStatus;
+  onBack: () => void;
+}) {
+  const copy = {
+    expired: {
+      title: "Payment window expired",
+      body: "This payment wasn't completed in time. Go back and start again.",
+    },
+    underpaid: {
+      title: "Amount too low",
+      body: `You sent $${usdcStroopsToAmount(status.received_usdc_stroops ?? 0)}, but $${usdcStroopsToAmount(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
+    },
+    overpaid: {
+      title: "Amount too high",
+      body: `You sent $${usdcStroopsToAmount(status.received_usdc_stroops ?? 0)}, but only $${usdcStroopsToAmount(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
+    },
+  }[status.status as "expired" | "underpaid" | "overpaid"];
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <p className="text-3xl">⚠️</p>
+      <p className="mt-3 text-lg font-semibold text-gray-900">{copy.title}</p>
+      <p className="mt-2 max-w-xs text-sm text-gray-500">{copy.body}</p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="mt-5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:border-black"
+      >
+        ‹ Back
+      </button>
     </div>
   );
 }
