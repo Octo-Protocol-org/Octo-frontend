@@ -13,7 +13,13 @@ export type { EncryptedBackup } from "./crypto";
 export { buildSignedPayment, buildSignedChangeTrust, buildUnsignedPayment } from "./tx";
 export type { SigningInfo } from "./tx";
 
-export { getSigningInfo, submitSigned, getBackup } from "./client";
+export {
+  getSigningInfo,
+  submitSigned,
+  getBackup,
+  requestWithdrawOtp,
+  confirmWithdraw,
+} from "./client";
 export type { SubmitResult } from "./client";
 
 export { saveLocalBackup, loadLocalBackup, clearLocalBackups } from "./store";

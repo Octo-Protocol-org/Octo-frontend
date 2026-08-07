@@ -2,18 +2,43 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signup, login, saveToken } from "@/lib/auth";
+import { signup, login, verifyEmail, resendOtp, needsVerification, saveToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { OtpInput } from "./OtpInput";
 
 type Mode = "signup" | "login";
+type Step = "credentials" | "verify";
+
+const RESEND_COOLDOWN_SECS = 30;
 
 export function AuthForm({ mode }: { mode: Mode }) {
+  const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [userId, setUserId] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const isSignup = mode === "signup";
+
+  function finish(token: string) {
+    saveToken(token);
+    // Hard navigation so the dashboard mounts fresh with the token already in
+    // localStorage (avoids a client-router race that can bounce back to /login).
+    window.location.assign("/dashboard");
+  }
+
+  function startCooldown() {
+    setResendCooldown(RESEND_COOLDOWN_SECS);
+    const id = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) clearInterval(id);
+        return s - 1;
+      });
+    }, 1000);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,19 +55,92 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
     setLoading(true);
     try {
-      const result = isSignup
-        ? await signup(email, password)
-        : await login(email, password);
-      saveToken(result.token);
-      // Hard navigation so the dashboard mounts fresh with the token already in
-      // localStorage (avoids a client-router race that can bounce back to /login).
-      window.location.assign("/dashboard");
+      const result = isSignup ? await signup(email, password) : await login(email, password);
+      if (needsVerification(result)) {
+        setUserId(result.user_id);
+        setStep("verify");
+        startCooldown();
+      } else {
+        finish(result.token);
+      }
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Something went wrong. Please try again.",
       );
+    } finally {
       setLoading(false);
     }
+  }
+
+  async function onVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await verifyEmail(userId, code);
+      finish(result.token);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Invalid or expired code.");
+      setLoading(false);
+    }
+  }
+
+  async function onResend() {
+    if (resendCooldown > 0) return;
+    setError(null);
+    try {
+      await resendOtp(userId);
+      startCooldown();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not resend the code.");
+    }
+  }
+
+  if (step === "verify") {
+    return (
+      <div>
+        <h1 className="text-center text-3xl font-semibold text-foreground">Check your email</h1>
+        <p className="mt-3 text-center text-sm text-muted">
+          Enter the 6-digit code we sent to <span className="text-foreground">{email}</span>
+        </p>
+
+        <div className="my-7 h-px bg-white/10" />
+
+        <form onSubmit={onVerify} className="space-y-5">
+          <OtpInput value={code} onChange={setCode} disabled={loading} />
+
+          {error && (
+            <p className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="glass-btn-primary w-full rounded-xl py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Verifying…" : "Verify"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted">
+          Didn&apos;t get a code?{" "}
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={resendCooldown > 0}
+            className="font-semibold text-foreground hover:text-burgundy-bright disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+          </button>
+        </p>
+      </div>
+    );
   }
 
   return (
