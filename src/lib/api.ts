@@ -46,7 +46,13 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    throw new ApiError(body?.message ?? `Request failed (${res.status})`, res.status);
+    // The backend's 500 message is a generic "internal server error" with no actionable detail —
+    // swap in something a user can actually act on rather than surfacing that verbatim.
+    const message =
+      res.status >= 500
+        ? "Something went wrong on our end. Please try again in a moment."
+        : body?.message ?? `Request failed (${res.status})`;
+    throw new ApiError(message, res.status);
   }
   return body!.data;
 }

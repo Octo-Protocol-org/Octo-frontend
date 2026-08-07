@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
 import {
   getWallet,
@@ -379,13 +380,14 @@ function TrustlineModal({
         detail: res.detail ?? null,
       });
     } catch (err) {
-      setError(
+      const message =
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Could not add the trustline.",
-      );
+            : "Could not add the trustline.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -604,13 +606,14 @@ function WithdrawModal({
       await requestWithdrawOtp(token, walletId, signedXdr);
       setPendingXdr(signedXdr);
     } catch (err) {
-      setError(
+      const message =
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Withdrawal failed.",
-      );
+            : "Withdrawal failed.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -627,8 +630,13 @@ function WithdrawModal({
     try {
       const res = await confirmWithdraw(token, walletId, pendingXdr, code);
       setResult(res);
+      if (res.status !== "confirmed") {
+        toast.error(res.detail ?? "The withdrawal was not confirmed.");
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Invalid or expired code.");
+      const message = err instanceof ApiError ? err.message : "Invalid or expired code.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
