@@ -8,12 +8,20 @@ const CASES = [
     body: "Accept stablecoin payments with dedicated addresses and real-time deposit notifications, reconciled automatically to each customer.",
   },
   {
+    title: "Payment links",
+    body: "Generate a shareable checkout link for any amount — fixed or flexible — and track every payer's status without writing a line of integration code.",
+  },
+  {
     title: "Treasury & payouts",
     body: "Hold balances in one master wallet on Stellar today, with more chains on the roadmap, and disburse payouts programmatically — signed client-side, relayed through one API.",
   },
   {
     title: "Gas sponsorship",
     body: "Sponsor your users' Stellar transactions from your master wallet so they can transact without holding XLM for fees — abstracting gas away entirely.",
+  },
+  {
+    title: "USDC to fiat",
+    body: "Let your users off-ramp USDC balances directly to local bank accounts and mobile money — settlement handled for you, on the roadmap.",
     soon: true,
   },
 ];
