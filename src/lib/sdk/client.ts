@@ -26,6 +26,29 @@ export function submitSigned(token: string, walletId: string, signedXdr: string)
   });
 }
 
+/** Email an OTP bound to this exact signed transaction, ahead of a withdrawal relay. */
+export function requestWithdrawOtp(token: string, walletId: string, signedXdr: string) {
+  return apiFetch<{ sent: boolean }>(`/v1/wallets/${walletId}/withdraw/request-otp`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ transaction_xdr: signedXdr }),
+  });
+}
+
+/** Confirm the withdrawal OTP; only on success does the transaction actually relay to Horizon. */
+export function confirmWithdraw(
+  token: string,
+  walletId: string,
+  signedXdr: string,
+  code: string,
+) {
+  return apiFetch<SubmitResult>(`/v1/wallets/${walletId}/withdraw/confirm`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ transaction_xdr: signedXdr, code }),
+  });
+}
+
 /** Fetch the opaque encrypted backup blob for new-device recovery (may be null). */
 export function getBackup(token: string, walletId: string) {
   return apiFetch<{ wallet_id: string; encrypted_backup: string | null }>(

@@ -20,10 +20,13 @@ import {
   unlockWallet,
   getSigningInfo,
   submitSigned,
+  requestWithdrawOtp,
+  confirmWithdraw,
   buildSignedPayment,
   buildSignedChangeTrust,
   type SubmitResult,
 } from "@/lib/sdk";
+import { OtpInput } from "@/components/auth/OtpInput";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
@@ -566,11 +569,14 @@ function WithdrawModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmitResult | null>(null);
+  // Once the transaction is signed, it's held here awaiting OTP confirmation before it ever relays.
+  const [pendingXdr, setPendingXdr] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   const selected =
     assets.find((a) => a.code === selectedCode) ?? assets[0];
 
-  async function submit() {
+  async function requestOtp() {
     setError(null);
     if (!destination.startsWith("G") && !destination.startsWith("M")) {
       setError("Destination must be a Stellar address (G… or M…).");
@@ -586,8 +592,8 @@ function WithdrawModal({
     }
     setSubmitting(true);
     try {
-      // Unlock, build + sign the payment locally, then relay the signed XDR. The private key
-      // never leaves this device.
+      // Unlock and sign locally — the private key never leaves this device. Only after signing
+      // do we ask the server to email an OTP bound to this exact transaction.
       const keypair = await unlockWallet(token, walletId, password);
       const info = await getSigningInfo(token, walletId);
       const signedXdr = buildSignedPayment(keypair, info, {
@@ -595,8 +601,8 @@ function WithdrawModal({
         amount, // decimal string, e.g. "1.5"
         asset: selected.asset, // undefined => XLM
       });
-      const res = await submitSigned(token, walletId, signedXdr);
-      setResult(res);
+      await requestWithdrawOtp(token, walletId, signedXdr);
+      setPendingXdr(signedXdr);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -605,6 +611,24 @@ function WithdrawModal({
             ? err.message
             : "Withdrawal failed.",
       );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function confirm() {
+    if (!pendingXdr) return;
+    setError(null);
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await confirmWithdraw(token, walletId, pendingXdr, code);
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Invalid or expired code.");
     } finally {
       setSubmitting(false);
     }
@@ -643,6 +667,48 @@ function WithdrawModal({
             Done
           </button>
         </div>
+      </Modal>
+    );
+  }
+
+  if (pendingXdr) {
+    return (
+      <Modal title="Verify withdrawal" onClose={onClose}>
+        <p className="text-center text-sm text-muted">
+          Enter the 6-digit code we emailed you to confirm this withdrawal of{" "}
+          <span className="text-foreground">
+            {amount} {selected.code}
+          </span>
+          .
+        </p>
+
+        <div className="mt-5">
+          <OtpInput value={code} onChange={setCode} disabled={submitting} />
+        </div>
+
+        {error && (
+          <p className="mt-4 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={confirm}
+          disabled={submitting}
+          className="mt-5 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
+        >
+          {submitting ? "Confirming…" : "Verify & withdraw"}
+        </button>
+        <button
+          onClick={() => {
+            setPendingXdr(null);
+            setCode("");
+            setError(null);
+          }}
+          className="mt-3 w-full text-center text-xs text-muted hover:text-foreground"
+        >
+          Back
+        </button>
       </Modal>
     );
   }
@@ -723,7 +789,7 @@ function WithdrawModal({
         )}
 
         <button
-          onClick={submit}
+          onClick={requestOtp}
           disabled={submitting}
           className="w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
         >
