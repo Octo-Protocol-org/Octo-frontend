@@ -11,6 +11,7 @@ import {
   type Balance,
 } from "@/lib/wallets";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { AssetIcon } from "@/components/dashboard/AssetIcon";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
@@ -212,9 +213,11 @@ function AssetRow({
     <tr>
       <td className="py-3 pr-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-burgundy/30 text-[10px] font-semibold text-burgundy-bright">
-            {code.slice(0, 4)}
-          </span>
+          <AssetIcon
+            isNative={isNative}
+            code={balance.asset_code}
+            issuer={balance.asset_issuer}
+          />
           <div>
             <p className="text-sm text-foreground">{name}</p>
             <p className="text-[11px] text-muted">{code}</p>
