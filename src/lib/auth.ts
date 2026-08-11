@@ -6,7 +6,7 @@ import { apiFetch } from "./api";
 
 const TOKEN_KEY = "octo_token";
 
-export type User = { id: string; email: string };
+export type User = { id: string; email: string; username: string | null };
 export type AuthResult = { token: string; user: User };
 /** Returned by signup/login when the account still needs OTP verification. */
 export type VerificationRequired = { user_id: string; email_verification_required: true };
@@ -53,6 +53,21 @@ export async function resendOtp(userId: string): Promise<{ sent: boolean }> {
 
 export async function me(token: string): Promise<User> {
   return apiFetch<User>("/v1/auth/me", { token });
+}
+
+/** Set the signed-in user's display username (3–20 chars, letters/digits/underscore/hyphen). */
+export async function updateUsername(token: string, username: string): Promise<User> {
+  return apiFetch<User>("/v1/auth/me", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ username }),
+  });
+}
+
+/** What to show for a user when no full profile page makes sense — falls back to the email
+ * handle until they set a username. */
+export function displayName(user: Pick<User, "email" | "username">): string {
+  return user.username ?? user.email.split("@")[0];
 }
 
 // --- token storage (localStorage; bearer-token auth, not cookies) ---

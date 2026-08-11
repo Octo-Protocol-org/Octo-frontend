@@ -44,7 +44,7 @@ export default function SponsorshipPage() {
   }
 
   return (
-    <DashboardShell email={user.email} title="Gas Sponsorship" onLogout={logout}>
+    <DashboardShell user={user} title="Gas Sponsorship" onLogout={logout}>
       <div className="mx-auto max-w-5xl space-y-8">
         {/* How it works */}
         <section className="rounded-2xl border border-white/10 bg-burgundy-soft/30 p-6">
