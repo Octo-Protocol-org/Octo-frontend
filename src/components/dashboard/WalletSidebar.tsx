@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { GasPumpIcon } from "./icons";
 
 export function WalletSidebar({
   walletId,
@@ -21,7 +22,11 @@ export function WalletSidebar({
     { label: "Addresses", href: `${base}/addresses`, icon: "▢" },
     { label: "Payment Links", href: `${base}/payment-links`, icon: "⎘" },
     { label: "Beneficiaries", href: `${base}/beneficiaries`, icon: "⚇" },
-    { label: "Sponsorship", href: `${base}/sponsorship`, icon: "⛽" },
+    {
+      label: "Sponsorship",
+      href: `${base}/sponsorship`,
+      icon: <GasPumpIcon />,
+    },
     { label: "Developers", href: `${base}/api`, icon: "›_" },
   ];
 
