@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { displayName, type User } from "@/lib/auth";
+import { GasPumpIcon } from "./icons";
 
 const NAV: {
   label: string;
