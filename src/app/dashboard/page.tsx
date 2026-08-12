@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { displayName } from "@/lib/auth";
 import { listWallets, type WalletView } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
@@ -61,15 +62,13 @@ export default function DashboardHome() {
   })();
 
   return (
-    <DashboardShell email={user.email} title="Wallets" onLogout={logout}>
+    <DashboardShell user={user} title="Wallets" onLogout={logout}>
       <div className="mx-auto max-w-5xl">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-3xl font-semibold text-foreground">
               {greeting},{" "}
-              <span className="text-burgundy-bright">
-                {user.email.split("@")[0]}
-              </span>
+              <span className="text-burgundy-bright">{displayName(user)}</span>
             </h2>
             <p className="mt-1 text-sm text-muted">
               It&apos;s{" "}
@@ -79,7 +78,15 @@ export default function DashboardHome() {
                 day: "numeric",
                 year: "numeric",
               })}
-              .
+              .{" "}
+              {!user.username && (
+                <Link
+                  href="/dashboard/settings"
+                  className="text-burgundy-bright hover:underline"
+                >
+                  Set a username →
+                </Link>
+              )}
             </p>
           </div>
           <Link

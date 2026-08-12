@@ -90,7 +90,7 @@ export function NewWalletClient() {
   }
 
   return (
-    <DashboardShell email={user.email} title="New master wallet" onLogout={logout}>
+    <DashboardShell user={user} title="New master wallet" onLogout={logout}>
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center gap-2 text-sm text-muted">
           <Link href="/dashboard" className="hover:text-foreground">
