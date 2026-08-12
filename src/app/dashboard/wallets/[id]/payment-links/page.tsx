@@ -266,7 +266,11 @@ export default function PaymentLinksPage({
               Share this link with your customers — anyone with it can pay, no Octo
               account required.
             </p>
-            <CopyField label="Payment link" value={created.url ?? payUrl(created.slug)} />
+            <CopyField
+              label="Payment link"
+              value={created.url ?? payUrl(created.slug)}
+              qr
+            />
           </div>
         </Modal>
       )}
@@ -381,7 +385,7 @@ function LinkDetail({
             ${usdcStroopsToAmount(link.collected_usdc_stroops)}
           </p>
         </div>
-        <CopyField label="Public link" value={link.url ?? payUrl(link.slug)} />
+        <CopyField label="Public link" value={link.url ?? payUrl(link.slug)} qr />
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-lg bg-black/30 p-3">
             <p className="text-muted">Amount</p>

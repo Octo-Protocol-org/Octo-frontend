@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/components/CopyButton";
 
 export function Modal({
@@ -34,16 +36,50 @@ export function Modal({
   );
 }
 
-export function CopyField({ label, value }: { label: string; value: string }) {
+/** `qr` shows a "Scan QR" trigger that pops up a scannable code for `value` — opt in per
+ * field, since most CopyField uses (tx hashes, issuers) aren't meant to be scanned. */
+export function CopyField({
+  label,
+  value,
+  qr = false,
+}: {
+  label: string;
+  value: string;
+  qr?: boolean;
+}) {
+  const [showQr, setShowQr] = useState(false);
+
   return (
     <div>
       <p className="text-xs text-muted">{label}</p>
       <div className="mt-1 flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2">
+        {qr && (
+          <button
+            type="button"
+            onClick={() => setShowQr(true)}
+            className="shrink-0 text-xs font-medium text-burgundy-bright hover:underline"
+          >
+            Scan QR
+          </button>
+        )}
         <span className="flex-1 truncate font-mono text-xs text-foreground">
           {value}
         </span>
         <CopyButton value={value} />
       </div>
+
+      {showQr && (
+        <Modal title="Scan to pay" onClose={() => setShowQr(false)}>
+          <div className="flex flex-col items-center gap-4">
+            <div className="rounded-xl bg-white p-4">
+              <QRCodeSVG value={value} size={220} />
+            </div>
+            <p className="max-w-xs text-center text-xs text-muted">
+              Scan with a phone camera to open this payment link.
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
