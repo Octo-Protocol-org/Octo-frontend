@@ -50,7 +50,7 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <DashboardShell email={user.email} title="Audit Logs" onLogout={logout}>
+    <DashboardShell user={user} title="Audit Logs" onLogout={logout}>
       <div className="mx-auto max-w-6xl">
         {/* controls */}
         <div className="flex flex-wrap items-center gap-3">

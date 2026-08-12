@@ -3,15 +3,16 @@
 import { Sidebar } from "./Sidebar";
 import { Parallax } from "@/components/Parallax";
 import { DashboardBackground } from "./DashboardBackground";
+import type { User } from "@/lib/auth";
 
 /** Dashboard chrome: test-mode banner, sidebar, topbar, content. */
 export function DashboardShell({
-  email,
+  user,
   title,
   onLogout,
   children,
 }: {
-  email?: string;
+  user?: User | null;
   title: string;
   onLogout: () => void;
   children: React.ReactNode;
@@ -27,7 +28,7 @@ export function DashboardShell({
       </div>
 
       <div className="relative z-10 flex flex-1">
-        <Sidebar email={email} />
+        <Sidebar user={user} />
 
         <div className="flex flex-1 flex-col">
           {/* topbar */}

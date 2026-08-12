@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { displayName, type User } from "@/lib/auth";
 
 const NAV: { label: string; href: string; icon: string; soon?: boolean }[] = [
   { label: "Home", href: "/dashboard", icon: "⌂" },
@@ -10,9 +11,10 @@ const NAV: { label: string; href: string; icon: string; soon?: boolean }[] = [
   { label: "Asset Recovery", href: "/dashboard/recovery", icon: "↺" },
   { label: "Developers", href: "/dashboard/developers", icon: "›_" },
   { label: "Audit Logs", href: "/dashboard/audit", icon: "▤" },
+  { label: "Settings", href: "/dashboard/settings", icon: "⚙" },
 ];
 
-export function Sidebar({ email }: { email?: string }) {
+export function Sidebar({ user }: { user?: User | null }) {
   const pathname = usePathname();
 
   return (
@@ -20,7 +22,7 @@ export function Sidebar({ email }: { email?: string }) {
       <div className="px-3">
         <Logo />
         <p className="mt-5 text-sm font-medium text-foreground">
-          {email?.split("@")[0] ?? "Account"}
+          {user ? displayName(user) : "Account"}
         </p>
         <p className="text-xs text-muted">
           {new Date().toLocaleDateString("en-US", {
