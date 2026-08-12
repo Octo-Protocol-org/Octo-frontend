@@ -4,10 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { displayName, type User } from "@/lib/auth";
+import { GasPumpIcon } from "./icons";
 
-const NAV: { label: string; href: string; icon: string; soon?: boolean }[] = [
+const NAV: {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  soon?: boolean;
+}[] = [
   { label: "Home", href: "/dashboard", icon: "⌂" },
-  { label: "Gas Sponsorship", href: "/dashboard/sponsorship", icon: "⛽" },
+  {
+    label: "Gas Sponsorship",
+    href: "/dashboard/sponsorship",
+    icon: <GasPumpIcon />,
+  },
   { label: "Asset Recovery", href: "/dashboard/recovery", icon: "↺" },
   { label: "Developers", href: "/dashboard/developers", icon: "›_" },
   { label: "Audit Logs", href: "/dashboard/audit", icon: "▤" },
