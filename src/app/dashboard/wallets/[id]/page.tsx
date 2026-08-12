@@ -29,6 +29,7 @@ import {
 } from "@/lib/sdk";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
+import { AssetIcon } from "@/components/dashboard/AssetIcon";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
@@ -195,9 +196,11 @@ export default function WalletOverview({
                         className="flex items-center justify-between py-3"
                       >
                         <span className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-burgundy/30 text-xs text-burgundy-bright">
-                            {b.asset_type === "native" ? "XLM" : b.asset_code ?? "?"}
-                          </span>
+                          <AssetIcon
+                            isNative={b.asset_type === "native"}
+                            code={b.asset_code}
+                            issuer={b.asset_issuer}
+                          />
                           <span className="text-sm text-foreground">
                             {b.asset_type === "native" ? "Stellar Lumens" : b.asset_code}
                           </span>
