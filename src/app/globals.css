@@ -426,6 +426,27 @@ body {
  * Theme switching
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * Decorative backdrop softening
+ * ------------------------------------------------------------------ */
+
+/* Marks the purely decorative layers behind page content (grid, glows, ink blooms).
+   Dark hides its own detail in shadow, but on light every line competes with the text sitting
+   on top — so light mode blurs these and lays a veil over them to push them back. */
+[data-theme="light"] .bg-decor {
+  filter: blur(2px);
+}
+
+/* Veil between the decoration and the content, so cards and modals read cleanly. */
+[data-theme="light"] .bg-decor-veil::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--background);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* The toggle shows the theme you'd switch *to*, swapped by CSS so it never hydrates wrong. */
 .theme-icon-sun,
 .theme-icon-moon {

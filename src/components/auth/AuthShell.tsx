@@ -10,10 +10,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="relative min-h-screen">
       {/* Fixed backdrop: burgundy glow + faint isometric grid. The underwater
           animation itself is rendered (also fixed) inside AuthWalletScene. */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute inset-0 glow-burgundy opacity-50" />
+      <div className="bg-decor-veil pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="bg-decor absolute inset-0 glow-burgundy opacity-50" />
         <div
-          className="absolute inset-0"
+          className="bg-decor absolute inset-0"
           style={{
             backgroundImage:
               "linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)",
