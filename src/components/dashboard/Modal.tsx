@@ -36,6 +36,52 @@ export function Modal({
   );
 }
 
+/** Confirmation dialog for destructive or risky actions — a deliberate second step
+ * instead of window.confirm, so the risk can be explained in-context. */
+export function ConfirmModal({
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  destructive = false,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="text-sm text-muted">{message}</div>
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-sunken"
+        >
+          {cancelLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className={
+            destructive
+              ? "rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              : "rounded-lg bg-burgundy-bright px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          }
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 /** `qr` shows a "Scan QR" trigger that pops up a scannable code for `value` — opt in per
  * field, since most CopyField uses (tx hashes, issuers) aren't meant to be scanned. */
 export function CopyField({

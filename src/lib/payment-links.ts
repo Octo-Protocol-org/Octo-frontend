@@ -3,6 +3,7 @@
 "use client";
 
 import { apiFetch } from "./api";
+import type { AuthToken, WalletId } from "./brands";
 
 export type PaymentLink = {
   id: string;
@@ -26,8 +27,8 @@ type Paginated<T> = {
 };
 
 export async function listPaymentLinks(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
 ): Promise<PaymentLink[]> {
   const page = await apiFetch<Paginated<PaymentLink>>(
     `/v1/wallets/${walletId}/payment-links`,
@@ -38,8 +39,8 @@ export async function listPaymentLinks(
 
 /** Paginated payment links, preserving `next_cursor` for page controls. */
 export function listPaymentLinksPage(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   opts?: { limit?: number; before?: string | null },
 ): Promise<{ data: PaymentLink[]; next_cursor: string | null }> {
   const params = new URLSearchParams();
@@ -65,8 +66,8 @@ export type PaymentLinkPayment = {
 };
 
 export function listPaymentLinkPayments(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   linkId: string,
   opts?: { limit?: number; before?: string | null },
 ): Promise<{ data: PaymentLinkPayment[]; next_cursor: string | null }> {
@@ -81,8 +82,8 @@ export function listPaymentLinkPayments(
 }
 
 export function createPaymentLink(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   params: {
     name: string;
     description?: string;
@@ -104,7 +105,11 @@ export function createPaymentLink(
   });
 }
 
-export function getPaymentLink(token: string, walletId: string, linkId: string) {
+export function getPaymentLink(
+  token: AuthToken,
+  walletId: WalletId,
+  linkId: string,
+) {
   return apiFetch<PaymentLink>(
     `/v1/wallets/${walletId}/payment-links/${linkId}`,
     { token },
@@ -112,8 +117,8 @@ export function getPaymentLink(token: string, walletId: string, linkId: string) 
 }
 
 export function setPaymentLinkActive(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   linkId: string,
   active: boolean,
 ) {

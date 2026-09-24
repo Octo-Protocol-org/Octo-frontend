@@ -3,6 +3,10 @@
  *
  * The full client-side flow: generate/recover a key, encrypt it for backup, build + sign
  * transactions locally, and relay the signed XDR to Octo. The private key never leaves here.
+ *
+ * Password hygiene: the decrypted keypair is only needed for the instant of signing. Callers
+ * must clear the password from state in a `finally` right after signing and never retain the
+ * `Keypair` in state or refs beyond the submit function.
  */
 export { generateWallet, fromMnemonic, keypairFromRawSeed } from "./keys";
 export type { WalletKeys } from "./keys";

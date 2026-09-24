@@ -10,7 +10,13 @@
  */
 
 const PBKDF2_ITERATIONS = 600_000;
+const MIN_ITERATIONS = 600_000;
+const MAX_ITERATIONS = 10_000_000;
 const KEY_LENGTH_BITS = 256;
+const SALT_BYTES = 16;
+const NONCE_BYTES = 12;
+
+const MALFORMED_BACKUP = "Malformed or unrecognized backup.";
 
 export type EncryptedBackup = {
   /** Format version, for forward-compatibility. */
@@ -72,8 +78,8 @@ export async function encryptSeed(
   plaintext: string,
   password: string,
 ): Promise<EncryptedBackup> {
-  const salt = randomBytes(16);
-  const nonce = randomBytes(12);
+  const salt = randomBytes(SALT_BYTES);
+  const nonce = randomBytes(NONCE_BYTES);
   const key = await deriveKey(password, salt, PBKDF2_ITERATIONS);
   const ptBytes = new TextEncoder().encode(plaintext) as Uint8Array<ArrayBuffer>;
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, ptBytes);
@@ -113,11 +119,33 @@ export function serializeBackup(backup: EncryptedBackup): string {
   return JSON.stringify(backup);
 }
 
-/** Parse a backup blob string; throws if malformed. */
+/** Parse a backup blob string; throws if malformed or if KDF parameters are out of range. */
 export function parseBackup(s: string): EncryptedBackup {
-  const b = JSON.parse(s) as EncryptedBackup;
-  if (b.v !== 1 || b.kdf !== "PBKDF2-SHA256" || !b.salt || !b.nonce || !b.ciphertext) {
-    throw new Error("Unrecognized backup format.");
+  let b: EncryptedBackup;
+  try {
+    b = JSON.parse(s) as EncryptedBackup;
+  } catch {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (!b || typeof b !== "object" || b.v !== 1 || b.kdf !== "PBKDF2-SHA256") {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (typeof b.iter !== "number" || !Number.isInteger(b.iter) || b.iter < MIN_ITERATIONS || b.iter > MAX_ITERATIONS) {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (typeof b.salt !== "string" || typeof b.nonce !== "string" || typeof b.ciphertext !== "string") {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  let salt: Uint8Array;
+  let nonce: Uint8Array;
+  try {
+    salt = fromB64(b.salt);
+    nonce = fromB64(b.nonce);
+  } catch {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (salt.length !== SALT_BYTES || nonce.length !== NONCE_BYTES) {
+    throw new Error(MALFORMED_BACKUP);
   }
   return b;
 }

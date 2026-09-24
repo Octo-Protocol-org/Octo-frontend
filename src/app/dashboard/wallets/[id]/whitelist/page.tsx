@@ -17,6 +17,7 @@ import {
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
+import { Modal } from "@/components/dashboard/Modal";
 import { PageSpinner } from "@/components/OctoSpinner";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
@@ -44,6 +45,7 @@ export default function WhitelistPage({
   const [entries, setEntries] = useState<WhitelistedAddress[]>([]);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState(false);
 
   const [addr, setAddr] = useState("");
   const [label, setLabel] = useState("");
@@ -62,12 +64,11 @@ export default function WhitelistPage({
       .catch(() => setEntries([]));
   }, [token, id]);
 
-  async function handleToggle() {
+  async function applyToggle(next: boolean) {
     if (!token) return;
     setError(null);
     setToggling(true);
     try {
-      const next = !enabled;
       const res = await setWhitelistEnabled(token, id, next);
       setEnabled(res.enabled);
     } catch (e) {
@@ -87,6 +88,21 @@ export default function WhitelistPage({
       return "This is the wallet's own address — sending to yourself is not allowed.";
     }
     return null;
+  function handleToggle() {
+    if (!token) return;
+    // Disabling is an anti-fraud control change — require a deliberate second step.
+    if (enabled) {
+      setConfirmDisable(true);
+      return;
+    }
+    // Enabling with no entries would block every withdrawal — warn instead of silently arming it.
+    if (entries.length === 0) {
+      setError(
+        "Add at least one address before enabling the allowlist — enabling it empty blocks every withdrawal."
+      );
+      return;
+    }
+    void applyToggle(true);
   }
 
   async function handleAdd(e: FormEvent) {
@@ -248,7 +264,7 @@ export default function WhitelistPage({
                   label={adding ? "Adding…" : "Add address"}
                   type="submit"
                   loading={adding}
-                  disabled={adding}
+                  disabled={!addr.trim()}
                 />
               </form>
             </Panel>
@@ -257,7 +273,7 @@ export default function WhitelistPage({
               {entries.length === 0 ? (
                 <Empty
                   title="No addresses yet"
-                  description="Add at least one address before enabling enforcement."
+                  body="Add at least one destination before enabling the allowlist."
                 />
               ) : (
                 <ul className="divide-y divide-border">
@@ -278,7 +294,6 @@ export default function WhitelistPage({
                         label={removingId === entry.id ? "Removing…" : "Remove"}
                         onClick={() => handleRemove(entry.id)}
                         loading={removingId === entry.id}
-                        disabled={removingId === entry.id}
                       />
                     </li>
                   ))}
@@ -289,6 +304,33 @@ export default function WhitelistPage({
           </main>
         </div>
       </div>
+
+      <Modal
+        open={confirmDisable}
+        onClose={() => setConfirmDisable(false)}
+        title="Disable the withdrawal allowlist?"
+      >
+        <p className="text-sm text-muted">
+          The allowlist is an anti-fraud control. Disabling it lets outbound payments
+          reach <strong className="text-foreground">any</strong> destination, including
+          ones you have not reviewed. Only continue if you intend to allow all
+          withdrawals from this wallet.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <ActionButton
+            label="Keep it enabled"
+            onClick={() => setConfirmDisable(false)}
+          />
+          <ActionButton
+            label={toggling ? "Disabling…" : "Disable allowlist"}
+            loading={toggling}
+            onClick={() => {
+              setConfirmDisable(false);
+              void applyToggle(false);
+            }}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
