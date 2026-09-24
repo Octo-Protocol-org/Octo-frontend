@@ -38,6 +38,11 @@ const CLOUDINARY_CDN = "https://res.cloudinary.com";
 // src/lib/theme.test.ts recomputes this and fails if the script and hash drift apart.
 const THEME_SCRIPT_HASH = "'sha256-b0IjdpRDazTe7ymepRk7Xjq0NgKhw2H6Gs56SknLntg='";
 
+// CSP violation reporting endpoint. When set, both CSP branches report violations here so an
+// injection attempt (or a regression we shipped) is visible instead of silently blocked.
+const CSP_REPORT_ENDPOINT = process.env.CSP_REPORT_URI;
+const CSP_REPORT_GROUP = "csp-endpoint";
+
 export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
   const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
@@ -54,6 +59,12 @@ export function proxy(request: NextRequest) {
   // dashboard pages (overview, audit, sponsorship) only read data and use the lighter CSP.
   // Matches /dashboard/wallets/new (keygen) and /dashboard/wallets/<id>/* (signing).
   const isSigningSurface = /^\/dashboard\/wallets\/[^/]+/.test(pathname);
+
+  // Only add reporting directives when an endpoint is configured, so an unset variable leaves
+  // the CSP and headers exactly as before.
+  const reportDirectives = CSP_REPORT_ENDPOINT
+    ? [`report-uri ${CSP_REPORT_ENDPOINT}`, `report-to ${CSP_REPORT_GROUP}`]
+    : [];
 
   const requestHeaders = new Headers(request.headers);
   let csp: string;
@@ -75,6 +86,7 @@ export function proxy(request: NextRequest) {
       `form-action 'self'`,
       `frame-ancestors 'none'`,
       `upgrade-insecure-requests`,
+      ...reportDirectives,
     ].join("; ");
     // Pass the nonce down so Next.js attaches it to its framework/page scripts.
     requestHeaders.set("x-nonce", nonce);
@@ -93,6 +105,7 @@ export function proxy(request: NextRequest) {
       `form-action 'self'`,
       `frame-ancestors 'none'`,
       `upgrade-insecure-requests`,
+      ...reportDirectives,
     ].join("; ");
   }
 
@@ -101,6 +114,13 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("Content-Security-Policy", csp);
+  // Reporting-Endpoints pairs with the CSP `report-to` directive so browsers can POST violations.
+  if (CSP_REPORT_ENDPOINT) {
+    response.headers.set(
+      "Reporting-Endpoints",
+      `${CSP_REPORT_GROUP}="${CSP_REPORT_ENDPOINT}"`,
+    );
+  }
   // Defense-in-depth headers.
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
