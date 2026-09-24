@@ -12,6 +12,8 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardHome() {
   const { user, token, loading, logout } = useAuth();
   const [wallets, setWallets] = useState<WalletView[] | null>(null);

@@ -43,17 +43,21 @@ export function proxy(request: NextRequest) {
   const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
   const img = `img-src 'self' blob: data: ${CLOUDINARY_CDN}`;
 
-  // The signing surface (dashboard) handles decrypted keys, so it gets a strict, nonce-based CSP
-  // with no `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each
-  // page's `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its
-  // scripts. Marketing/login/docs pages handle no keys and stay static, so they get a lighter CSP
-  // that does not require a nonce (a nonce would block their prerendered scripts).
+  // The authenticated dashboard handles decrypted keys and the encrypted key backups in
+  // localStorage, so every /dashboard/* route gets a strict, nonce-based CSP with no
+  // `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each page's
+  // `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its scripts.
+  // The public checkout (/pay/*) builds transactions and talks to Freighter, so it is the most
+  // attacker-facing page and gets the same strict policy. Marketing/login/docs pages handle no
+  // keys and stay static, so they get a lighter CSP that does not require a nonce (a nonce would
+  // block their prerendered scripts).
   const pathname = request.nextUrl.pathname;
-  // The strict CSP applies to routes that actually decrypt/handle a private key in the browser:
-  // wallet creation (keygen) and the per-wallet page (withdraw/trustline signing). Other
-  // dashboard pages (overview, audit, sponsorship) only read data and use the lighter CSP.
-  // Matches /dashboard/wallets/new (keygen) and /dashboard/wallets/<id>/* (signing).
-  const isSigningSurface = /^\/dashboard\/wallets\/[^/]+/.test(pathname);
+  // The strict CSP applies to the whole authenticated dashboard (overview, settings, audit,
+  // sponsorship, wallet creation/keygen and the per-wallet page with withdraw/trustline signing)
+  // and to the public checkout, where an XSS could tamper with the transaction or the payer's
+  // details before signing.
+  const isSigningSurface =
+    /^\/dashboard(\/|$)/.test(pathname) || /^\/pay(\/|$)/.test(pathname);
 
   const requestHeaders = new Headers(request.headers);
   let csp: string;

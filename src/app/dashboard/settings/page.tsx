@@ -8,6 +8,8 @@ import { ApiError } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
+export const dynamic = "force-dynamic";
+
 export default function SettingsPage() {
   const { user, token, loading, logout } = useAuth();
   // Set only once a save succeeds, so the sidebar/greeting reflect it immediately without
