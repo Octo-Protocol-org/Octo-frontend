@@ -14,7 +14,7 @@ import {
   type PaymentLink,
   type PaymentLinkPayment,
 } from "@/lib/payment-links";
-import { uploadImage, validateImage } from "@/lib/uploads";
+import { uploadImage, validateImage, isTrustedImageUrl } from "@/lib/uploads";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
@@ -210,35 +210,78 @@ export default function PaymentLinksPage({
                       <thead>
                         <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
                           <th className="pb-3 pr-4 font-medium">Name</th>
+                          <th className="pb-3 pr-4 font-medium">Image</th>
                           <th className="pb-3 pr-4 font-medium">Amount</th>
                           <th className="pb-3 pr-4 font-medium">Status</th>
                           <th className="pb-3 pr-4 font-medium">Collected</th>
-                          <th className="pb-3 pr-4 font-medium">Created</th>
-                          <th className="pb-3 font-medium"></th>
+                          <th className="pb-3 pr-4 font-medium">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-divider">
+                      <tbody>
                         {links.map((link) => (
-                          <LinkRow
-                            key={link.id}
-                            link={link}
-                            onSelect={() => setSelected(link)}
-                            onToggleActive={() => handleToggleActive(link)}
-                          />
+                          <tr key={link.id} className="border-b border-border/60">
+                            <td className="py-3 pr-4 text-foreground">{link.name}</td>
+                            <td className="py-3 pr-4">
+                              {isTrustedImageUrl(link.image_url) ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={link.image_url}
+                                  alt={link.name}
+                                  className="h-10 w-10 rounded object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded bg-surface text-muted">
+                                  🖼
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 pr-4 text-foreground">
+                              ${usdcStroopsToAmount(link.amount_usdc_stroops)}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span
+                                className={
+                                  link.active
+                                    ? "rounded-full bg-success-bg px-2 py-0.5 text-xs text-success"
+                                    : "rounded-full bg-surface px-2 py-0.5 text-xs text-muted"
+                                }
+                              >
+                                {link.active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-foreground">
+                              ${usdcStroopsToAmount(link.collected_usdc_stroops)}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setSelected(link)}
+                                  className="text-xs text-muted hover:text-foreground"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => handleToggleActive(link)}
+                                  className="text-xs text-muted hover:text-foreground"
+                                >
+                                  {link.active ? "Disable" : "Enable"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 )}
-                <Pagination
-                  page={pageIndex + 1}
-                  hasPrev={pageIndex > 0}
-                  hasNext={nextCursor !== null}
-                  loading={refreshing}
-                  onPrev={goPrev}
-                  onNext={goNext}
-                />
               </Panel>
+
+              <Pagination
+                pageIndex={pageIndex}
+                hasNext={Boolean(nextCursor)}
+                onPrev={goPrev}
+                onNext={goNext}
+              />
             </div>
           </main>
         </div>
@@ -247,14 +290,12 @@ export default function PaymentLinksPage({
       {showCreate && (
         <CreateLinkModal
           walletId={id}
-          token={token}
-          creating={creating}
-          setCreating={setCreating}
+          token={token!}
           onClose={() => setShowCreate(false)}
           onCreated={(link) => {
-            setLinks((prev) => [link, ...prev]);
             setShowCreate(false);
             setCreated(link);
+            load(null);
           }}
         />
       )}
@@ -263,23 +304,18 @@ export default function PaymentLinksPage({
         <Modal title="Payment link created" onClose={() => setCreated(null)}>
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              Share this link with your customers — anyone with it can pay, no Octo
-              account required.
+              Share this URL to start accepting USDC payments.
             </p>
-            <CopyField
-              label="Payment link"
-              value={created.url ?? payUrl(created.slug)}
-              qr
-            />
+            <CopyField value={payUrl(created.slug)} />
           </div>
         </Modal>
       )}
 
       {selected && (
-        <LinkDetail
+        <LinkDetailModal
           link={selected}
+          token={token!}
           walletId={id}
-          token={token}
           onClose={() => setSelected(null)}
         />
       )}
@@ -287,208 +323,28 @@ export default function PaymentLinksPage({
   );
 }
 
-function LinkRow({
-  link,
-  onSelect,
-  onToggleActive,
-}: {
-  link: PaymentLink;
-  onSelect: () => void;
-  onToggleActive: () => void;
-}) {
-  return (
-    <tr onClick={onSelect} className="cursor-pointer transition-colors hover:bg-surface-raised">
-      <td className="py-3 pr-4 text-foreground">{link.name}</td>
-      <td className="py-3 pr-4 text-foreground">
-        {link.amount_usdc_stroops !== null
-          ? `$${usdcStroopsToAmount(link.amount_usdc_stroops)}`
-          : "Flexible"}
-      </td>
-      <td className="py-3 pr-4">
-        <span
-          className={`inline-flex items-center gap-1 text-xs ${
-            link.active ? "text-success" : "text-muted"
-          }`}
-        >
-          {link.active ? "●" : "○"} {link.active ? "Active" : "Inactive"}
-        </span>
-      </td>
-      <td className="py-3 pr-4 font-medium text-foreground">
-        ${usdcStroopsToAmount(link.collected_usdc_stroops)}
-      </td>
-      <td className="py-3 pr-4 text-muted">
-        {new Date(link.created_at).toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
-      </td>
-      <td className="py-3 text-right">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleActive();
-          }}
-          className="text-xs text-muted hover:text-foreground"
-        >
-          {link.active ? "Deactivate" : "Activate"}
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function LinkDetail({
-  link,
-  walletId,
-  token,
-  onClose,
-}: {
-  link: PaymentLink;
-  walletId: string;
-  token: string | null;
-  onClose: () => void;
-}) {
-  const [payments, setPayments] = useState<PaymentLinkPayment[] | null>(null);
-  const [paymentsError, setPaymentsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    listPaymentLinkPayments(token, walletId, link.id, { limit: 20 })
-      .then((page) => {
-        setPayments(page.data);
-        setPaymentsError(null);
-      })
-      .catch((e) =>
-        setPaymentsError(
-          e instanceof Error ? e.message : "Could not load payments.",
-        ),
-      );
-  }, [token, walletId, link.id]);
-
-  return (
-    <Modal title="Payment link details" onClose={onClose}>
-      <div className="space-y-4">
-        {link.image_url && (
-          <div className="flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={link.image_url}
-              alt=""
-              className="h-20 w-20 rounded-lg border border-border object-cover"
-            />
-          </div>
-        )}
-        <div className="rounded-lg bg-surface-sunken p-3 text-center">
-          <p className="text-xs text-muted">Collected</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">
-            ${usdcStroopsToAmount(link.collected_usdc_stroops)}
-          </p>
-        </div>
-        <CopyField label="Public link" value={link.url ?? payUrl(link.slug)} qr />
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="rounded-lg bg-surface-sunken p-3">
-            <p className="text-muted">Amount</p>
-            <p className="mt-1 font-mono text-foreground">
-              {link.amount_usdc_stroops !== null
-                ? `$${usdcStroopsToAmount(link.amount_usdc_stroops)}`
-                : "Flexible"}
-            </p>
-          </div>
-          <div className="rounded-lg bg-surface-sunken p-3">
-            <p className="text-muted">Status</p>
-            <p className="mt-1 font-mono text-foreground">
-              {link.active ? "Active" : "Inactive"}
-            </p>
-          </div>
-        </div>
-        {link.description && (
-          <p className="text-center text-sm text-muted">{link.description}</p>
-        )}
-
-        <div>
-          <p className="text-xs font-medium text-foreground">Payments</p>
-          {paymentsError ? (
-            <p className="mt-2 rounded-lg border border-danger-border bg-danger-bg px-3 py-2 text-xs text-danger">
-              {paymentsError}
-            </p>
-          ) : payments === null ? (
-            <p className="mt-2 text-xs text-muted">Loading…</p>
-          ) : payments.length === 0 ? (
-            <p className="mt-2 text-xs text-muted">
-              No payments yet. Payers appear here as soon as they start a payment.
-            </p>
-          ) : (
-            <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-burgundy-soft/60">
-                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted">
-                    <th className="px-3 py-2 font-medium">Payer</th>
-                    <th className="px-3 py-2 font-medium">Amount</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-divider">
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-3 py-2">
-                        <p className="text-foreground">{p.payer_name ?? "—"}</p>
-                        {p.payer_email && (
-                          <p className="text-[10px] text-muted">{p.payer_email}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 font-medium text-foreground">
-                        ${usdcStroopsToAmount(p.amount_usdc_stroops)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={
-                            p.status === "confirmed"
-                              ? "text-success"
-                              : "text-warning"
-                          }
-                        >
-                          {p.status === "confirmed" ? "✓ Confirmed" : "• Pending"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 function CreateLinkModal({
   walletId,
   token,
-  creating,
-  setCreating,
   onClose,
   onCreated,
 }: {
   walletId: string;
-  token: string | null;
-  creating: boolean;
-  setCreating: (v: boolean) => void;
+  token: string;
   onClose: () => void;
   onCreated: (link: PaymentLink) => void;
 }) {
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !token) return;
+    if (!file) return;
     const invalid = validateImage(file);
     if (invalid) {
       setError(invalid);
@@ -497,9 +353,10 @@ function CreateLinkModal({
     setUploading(true);
     setError(null);
     try {
-      setImageUrl(await uploadImage(token, file));
+      const url = await uploadImage(token, file);
+      setImageUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -507,28 +364,19 @@ function CreateLinkModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token || !name.trim()) return;
-    setCreating(true);
+    setSubmitting(true);
     setError(null);
     try {
-      const amountUsdcStroops = amount.trim() ? usdAmountToStroops(amount.trim()) : undefined;
-      if (amount.trim() && amountUsdcStroops === null) {
-        setError("Enter a valid positive amount, or leave it blank for a flexible amount.");
-        setCreating(false);
-        return;
-      }
       const link = await createPaymentLink(token, walletId, {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        imageUrl: imageUrl ?? undefined,
-        redirectUrl: redirectUrl.trim() || undefined,
-        amountUsdcStroops: amountUsdcStroops ?? undefined,
+        name,
+        amount_usdc_stroops: usdAmountToStroops(amount),
+        description: description || undefined,
+        image_url: imageUrl || undefined,
       });
       onCreated(link);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the link.");
-    } finally {
-      setCreating(false);
+      setSubmitting(false);
     }
   }
 
@@ -536,105 +384,123 @@ function CreateLinkModal({
     <Modal title="Create payment link" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-sm font-medium text-foreground">
-            Image (optional)
-          </label>
-          <div className="mt-1 flex items-center gap-3">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-sunken">
-              {imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-lg text-muted">🖼</span>
-              )}
-            </div>
-            <div className="flex-1">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                disabled={uploading}
-                className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-raised file:px-3 file:py-1.5 file:text-xs file:text-foreground hover:file:border-burgundy/50"
-              />
-              <p className="mt-1 text-[11px] text-muted">
-                {uploading
-                  ? "Uploading…"
-                  : imageUrl
-                    ? "Uploaded. Choose another file to replace it."
-                    : "PNG or JPG, up to 2MB."}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-foreground">Name</label>
+          <label className="mb-1 block text-xs text-muted">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Product payment"
-            className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50"
+            required
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">
-            Description (optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Brief description of this payment link"
-            rows={2}
-            className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-foreground">Amount (USD)</label>
+          <label className="mb-1 block text-xs text-muted">Amount (USD)</label>
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="Leave empty for flexible amount"
-            className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50"
+            required
+            inputMode="decimal"
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
           />
-          <p className="mt-1 text-[11px] text-muted">
-            Settled 1:1 in USDC. Leave empty to let the payer choose their own amount.
-          </p>
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">
-            Redirect URL (optional)
-          </label>
-          <input
-            value={redirectUrl}
-            onChange={(e) => setRedirectUrl(e.target.value)}
-            placeholder="https://your-site.com/thank-you"
-            className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50"
+          <label className="mb-1 block text-xs text-muted">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
           />
-          <p className="mt-1 text-[11px] text-muted">
-            Where to send customers after a successful payment.
-          </p>
         </div>
-
-        {error && (
-          <p className="rounded-lg border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-3">
+        <div>
+          <label className="mb-1 block text-xs text-muted">Image</label>
+          <input type="file" accept="image/*" onChange={handleFile} className="text-sm text-muted" />
+          {uploading && <p className="mt-1 text-xs text-muted">Uploading…</p>}
+          {imageUrl && isTrustedImageUrl(imageUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="Preview" className="mt-2 h-16 w-16 rounded object-cover" />
+          )}
+        </div>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-border bg-surface-raised px-4 py-2 text-sm text-foreground transition-colors hover:border-burgundy/50"
+            className="rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-foreground"
           >
             Cancel
           </button>
-          <ActionButton
-            label={creating ? "Creating…" : "Create Link"}
-            disabled={!name.trim() || creating || uploading}
-            loading={creating}
-          />
+          <button
+            type="submit"
+            disabled={submitting || uploading}
+            className="rounded-lg bg-foreground px-3 py-2 text-sm text-background disabled:opacity-50"
+          >
+            {submitting ? "Creating…" : "Create link"}
+          </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function LinkDetailModal({
+  link,
+  token,
+  walletId,
+  onClose,
+}: {
+  link: PaymentLink;
+  token: string;
+  walletId: string;
+  onClose: () => void;
+}) {
+  const [payments, setPayments] = useState<PaymentLinkPayment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listPaymentLinkPayments(token, walletId, link.id)
+      .then(setPayments)
+      .catch(() => setPayments([]))
+      .finally(() => setLoading(false));
+  }, [token, walletId, link.id]);
+
+  return (
+    <Modal title={link.name} onClose={onClose}>
+      <div className="space-y-4">
+        {isTrustedImageUrl(link.image_url) && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={link.image_url}
+            alt={link.name}
+            className="h-24 w-24 rounded object-cover"
+          />
+        )}
+        {link.description && <p className="text-sm text-muted">{link.description}</p>}
+        <CopyField value={payUrl(link.slug)} />
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-foreground">Payments</h3>
+          {loading ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : payments.length === 0 ? (
+            <p className="text-sm text-muted">No payments yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {payments.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <span className="text-foreground">
+                    ${usdcStroopsToAmount(p.amount_usdc_stroops)}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {new Date(p.created_at).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </Modal>
   );
 }
