@@ -31,7 +31,7 @@ export default function DashboardHome() {
         // Fetch sponsorship configs in parallel so the wallet list never has to wait on them.
         // A single failed sponsorship fetch must not blank out the whole row.
         const results = await Promise.allSettled(
-          ws.map((w) => getSponsorshipConfig(token, w.id)),
+          ws.map((w) => getSponsorshipConfig(w.id, token)),
         );
         if (aborted) return;
         const map = new Map<string, SponsorshipConfig | null>();
@@ -244,14 +244,6 @@ function ManageMenu({ walletId }: { walletId: string }) {
 
       {open && (
         <>
-          <Link
-            href={`/dashboard/wallets/${walletId}`}
-            className="absolute right-0 top-full z-10 mt-1 block w-40 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground hover:border-border-strong"
-          >
-            Open wallet
-          </Link>
-        </>
-      )}
-    </div>
-  );
-}
+        
+
+/* … truncated 802 chars — edit only what you need near the top … */
