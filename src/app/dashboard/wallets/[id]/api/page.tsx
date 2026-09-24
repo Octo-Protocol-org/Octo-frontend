@@ -15,6 +15,8 @@ import { DashboardBackground } from "@/components/dashboard/DashboardBackground"
 import { PageSpinner } from "@/components/OctoSpinner";
 import { CopyButton } from "@/components/CopyButton";
 
+export const dynamic = "force-dynamic";
+
 export default function DevelopersPage({
   params,
 }: {
@@ -235,17 +237,17 @@ function ActionBtn({
   primary,
 }: {
   label: string;
-  onClick?: () => void;
+  onClick: () => void;
   primary?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+      className={
         primary
-          ? "bg-burgundy text-white hover:bg-burgundy-bright"
-          : "border border-border text-foreground hover:border-border-strong"
-      }`}
+          ? "rounded-lg bg-burgundy px-4 py-2 text-sm font-medium text-foreground hover:bg-burgundy-bright"
+          : "rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-foreground"
+      }
     >
       {label}
     </button>
