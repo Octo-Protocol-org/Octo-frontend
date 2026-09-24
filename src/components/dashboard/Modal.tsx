@@ -130,3 +130,23 @@ export function CopyField({
     </div>
   );
 }
+
+/** Renders a full, untruncated address with its first and last characters highlighted so a
+ * user can eyeball the ends against clipboard-hijacking malware before signing. */
+export function HighlightedAddress({ address }: { address: string }) {
+  if (address.length <= 2) {
+    return <span className="font-mono text-xs text-foreground">{address}</span>;
+  }
+
+  return (
+    <span className="break-all font-mono text-xs text-foreground">
+      <span className="rounded bg-burgundy-bright/20 px-0.5 font-semibold text-burgundy-bright">
+        {address.slice(0, 1)}
+      </span>
+      {address.slice(1, -1)}
+      <span className="rounded bg-burgundy-bright/20 px-0.5 font-semibold text-burgundy-bright">
+        {address.slice(-1)}
+      </span>
+    </span>
+  );
+}

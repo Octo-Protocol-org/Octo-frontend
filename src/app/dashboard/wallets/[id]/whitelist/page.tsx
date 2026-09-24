@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { StrKey } from "@stellar/stellar-base";
 import { useAuth } from "@/lib/useAuth";
 import {
   getWallet,
@@ -23,6 +24,14 @@ import { PageSpinner } from "@/components/OctoSpinner";
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
 export const dynamic = "force-dynamic";
 
+// Accepts only well-formed Stellar account (G…) or muxed account (M…) addresses.
+function isValidStellarAddress(value: string): boolean {
+  return (
+    StrKey.isValidEd25519PublicKey(value) ||
+    StrKey.isValidMed25519PublicKey(value)
+  );
+}
+
 export default function WhitelistPage({
   params,
 }: {
@@ -40,6 +49,7 @@ export default function WhitelistPage({
 
   const [addr, setAddr] = useState("");
   const [label, setLabel] = useState("");
+  const [addrError, setAddrError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -68,6 +78,16 @@ export default function WhitelistPage({
     }
   }
 
+  function validateAddr(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) return "Enter a Stellar address.";
+    if (!isValidStellarAddress(trimmed)) {
+      return "That is not a valid Stellar address (expected a G… or M… account).";
+    }
+    if (wallet && trimmed === wallet.address) {
+      return "This is the wallet's own address — sending to yourself is not allowed.";
+    }
+    return null;
   function handleToggle() {
     if (!token) return;
     // Disabling is an anti-fraud control change — require a deliberate second step.
@@ -87,14 +107,21 @@ export default function WhitelistPage({
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
-    if (!token || !addr.trim()) return;
+    if (!token) return;
+    const trimmed = addr.trim();
+    const validationError = validateAddr(trimmed);
+    if (validationError) {
+      setAddrError(validationError);
+      return;
+    }
     setAdding(true);
     setError(null);
     try {
-      const entry = await addWhitelistedAddress(token, id, addr.trim(), label.trim());
+      const entry = await addWhitelistedAddress(token, id, trimmed, label.trim());
       setEntries((prev) => [entry, ...prev]);
       setAddr("");
       setLabel("");
+      setAddrError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add that address.");
     } finally {
@@ -212,10 +239,17 @@ export default function WhitelistPage({
                   <label className="text-xs text-muted">Address (G… or M…)</label>
                   <input
                     value={addr}
-                    onChange={(e) => setAddr(e.target.value)}
+                    onChange={(e) => {
+                      setAddr(e.target.value);
+                      if (addrError) setAddrError(null);
+                    }}
+                    onBlur={() => setAddrError(validateAddr(addr))}
                     placeholder="GABC... or MABC..."
                     className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm font-mono text-foreground outline-none focus:border-burgundy/50"
                   />
+                  {addrError && (
+                    <p className="mt-1 text-xs text-danger">{addrError}</p>
+                  )}
                 </div>
                 <div className="min-w-[160px]">
                   <label className="text-xs text-muted">Label (optional)</label>
