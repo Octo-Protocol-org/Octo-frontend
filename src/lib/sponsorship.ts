@@ -4,6 +4,12 @@
 
 import { apiFetch } from "./api";
 
+/** Branded string so a token can never be passed where a wallet ID is expected. */
+export type AuthToken = string & { __brand: "AuthToken" };
+
+/** Branded string so a wallet ID can never be passed where a token is expected. */
+export type WalletId = string & { __brand: "WalletId" };
+
 export type SponsorshipConfig = {
   enabled: boolean;
   per_tx_fee_cap_stroops: number | null;
@@ -19,7 +25,7 @@ export type SponsorshipConfigPayload = {
 };
 
 /** Fetch the gas sponsorship config for a single wallet. */
-export function getSponsorshipConfig(walletId: string, token: string) {
+export function getSponsorshipConfig(token: AuthToken, walletId: WalletId) {
   return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
     token,
   });
@@ -27,8 +33,8 @@ export function getSponsorshipConfig(walletId: string, token: string) {
 
 /** Update (upsert) the gas sponsorship config for a wallet. */
 export function updateSponsorshipConfig(
-  walletId: string,
-  token: string,
+  token: AuthToken,
+  walletId: WalletId,
   payload: SponsorshipConfigPayload,
 ) {
   return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
@@ -60,8 +66,8 @@ export type SponsoredTxnPage = {
  * Pass the previous page's `next_cursor` to fetch the following page.
  */
 export function listSponsoredTransactions(
-  walletId: string,
-  token: string,
+  token: AuthToken,
+  walletId: WalletId,
   cursor?: string,
 ) {
   const params = new URLSearchParams({ limit: "50" });

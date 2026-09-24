@@ -13,7 +13,7 @@ export class ApiError extends Error {
   constructor(message: string, status: number) {
     super(message);
     this.name = "ApiError";
-    this.status = status;
+    this.status = res.status;
   }
 }
 
@@ -22,6 +22,21 @@ type Envelope<T> = {
   message: string;
   data: T;
 };
+
+/**
+ * Tagged template that URL-encodes every interpolated value, so dynamic path segments can't
+ * inject `/`, `..`, `?` or `#` and change the request path.
+ */
+export function path(
+  strings: TemplateStringsArray,
+  ...values: Array<string | number>
+): string {
+  return strings.reduce(
+    (acc, str, i) =>
+      i === 0 ? str : `${acc}${encodeURIComponent(String(values[i - 1]))}${str}`,
+    "",
+  );
+}
 
 export async function apiFetch<T>(
   path: string,

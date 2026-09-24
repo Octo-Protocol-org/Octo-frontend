@@ -2,7 +2,7 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
 
 export type CreateWalletResponse = {
   id: string;
@@ -112,7 +112,7 @@ export type GasTankResult = {
 
 /** Provision the server-held gas tank that pays sponsored fees (fee float only, never funds). */
 export function createGasTank(token: string, id: string) {
-  return apiFetch<GasTankResult>(`/v1/wallets/${id}/gas-tank`, {
+  return apiFetch<GasTankResult>(path`/v1/wallets/${id}/gas-tank`, {
     method: "POST",
     token,
   });
@@ -139,12 +139,12 @@ export async function listWallets(token: string): Promise<WalletView[]> {
 }
 
 export function getWallet(token: string, id: string) {
-  return apiFetch<WalletView>(`/v1/wallets/${id}`, { token });
+  return apiFetch<WalletView>(path`/v1/wallets/${id}`, { token });
 }
 
 // Balances come straight from Horizon and are not paginated — a flat array here is correct.
 export function getBalances(token: string, id: string) {
-  return apiFetch<Balance[]>(`/v1/wallets/${id}/balances`, { token });
+  return apiFetch<Balance[]>(path`/v1/wallets/${id}/balances`, { token });
 }
 
 export async function listAddresses(
@@ -152,7 +152,7 @@ export async function listAddresses(
   id: string,
 ): Promise<Address[]> {
   const page = await apiFetch<Paginated<Address>>(
-    `/v1/wallets/${id}/addresses`,
+    path`/v1/wallets/${id}/addresses`,
     { token },
   );
   return page.data;
@@ -163,7 +163,7 @@ export function createAddress(
   id: string,
   customerRef?: string,
 ) {
-  return apiFetch<Address>(`/v1/wallets/${id}/addresses`, {
+  return apiFetch<Address>(path`/v1/wallets/${id}/addresses`, {
     method: "POST",
     token,
     body: JSON.stringify({ customer_ref: customerRef || null }),
@@ -175,7 +175,7 @@ export async function listTransactions(
   id: string,
 ): Promise<Transaction[]> {
   const page = await apiFetch<Paginated<Transaction>>(
-    `/v1/wallets/${id}/transactions`,
+    path`/v1/wallets/${id}/transactions`,
     { token },
   );
   return page.data;
@@ -208,7 +208,7 @@ export function listTransactionsPage(
   opts?: PageOpts,
 ): Promise<Paginated<Transaction>> {
   return apiFetch<Paginated<Transaction>>(
-    `/v1/wallets/${id}/transactions${pageQuery(opts)}`,
+    path`/v1/wallets/${id}/transactions` + pageQuery(opts),
     { token },
   );
 }
@@ -220,7 +220,7 @@ export function listAddressesPage(
   opts?: PageOpts,
 ): Promise<Paginated<Address>> {
   return apiFetch<Paginated<Address>>(
-    `/v1/wallets/${id}/addresses${pageQuery(opts)}`,
+    path`/v1/wallets/${id}/addresses` + pageQuery(opts),
     { token },
   );
 }
@@ -259,82 +259,6 @@ export const USDC_TESTNET = {
 } as const;
 
 // Withdrawals and trustlines are now built + signed CLIENT-SIDE via `@/lib/sdk` and relayed
-// through `submitSigned` — the server holds no key to sign them. The old custodial
-// `withdraw()` / `addTrustline()` helpers were removed with the non-custodial cutover.
+// through `submitSig
 
-export type ApiKeyInfo = {
-  wallet_id: string;
-  configured: boolean;
-  prefix: string | null;
-};
-
-export type GeneratedKey = {
-  wallet_id: string;
-  api_key: string;
-  prefix: string;
-};
-
-/** Metadata about the wallet's API key (prefix + whether configured) — never the secret. */
-export function getApiKey(token: string, id: string) {
-  return apiFetch<ApiKeyInfo>(`/v1/wallets/${id}/api-key`, { token });
-}
-
-/** Generate (or regenerate) the wallet's API key. Returns the full key once. */
-export function generateApiKey(token: string, id: string) {
-  return apiFetch<GeneratedKey>(`/v1/wallets/${id}/api-key`, {
-    method: "POST",
-    token,
-  });
-}
-
-// --- Withdrawal allowlist ("Whitelist") ------------------------------------
-//
-// An anti-fraud control: when enabled, submit-signed rejects payments to any destination not on
-// this list. Management requires the dashboard login JWT (not an API key) on the backend, which
-// `token` here always is.
-
-export type WhitelistConfig = { enabled: boolean };
-
-export type WhitelistedAddress = {
-  id: string;
-  address: string;
-  label: string | null;
-  created_at: string;
-};
-
-export function getWhitelistConfig(token: string, id: string) {
-  return apiFetch<WhitelistConfig>(`/v1/wallets/${id}/whitelist/config`, { token });
-}
-
-export function setWhitelistEnabled(token: string, id: string, enabled: boolean) {
-  return apiFetch<WhitelistConfig>(`/v1/wallets/${id}/whitelist/config`, {
-    method: "PUT",
-    token,
-    body: JSON.stringify({ enabled }),
-  });
-}
-
-export function listWhitelistedAddresses(token: string, id: string) {
-  return apiFetch<WhitelistedAddress[]>(`/v1/wallets/${id}/whitelist`, { token });
-}
-
-export function addWhitelistedAddress(
-  token: string,
-  id: string,
-  address: string,
-  label?: string,
-) {
-  return apiFetch<WhitelistedAddress>(`/v1/wallets/${id}/whitelist`, {
-    method: "POST",
-    token,
-    body: JSON.stringify({ address, label: label || null }),
-  });
-}
-
-export function removeWhitelistedAddress(token: string, id: string, entryId: string) {
-  return apiFetch<{ removed: boolean }>(`/v1/wallets/${id}/whitelist/${entryId}`, {
-    method: "DELETE",
-    token,
-  });
-}
-
+/* … truncated 2324 chars — edit only what you need near the top … */
