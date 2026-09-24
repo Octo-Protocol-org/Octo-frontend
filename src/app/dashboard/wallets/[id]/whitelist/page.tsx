@@ -16,6 +16,7 @@ import {
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
+import { Modal } from "@/components/dashboard/Modal";
 import { PageSpinner } from "@/components/OctoSpinner";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
@@ -35,6 +36,7 @@ export default function WhitelistPage({
   const [entries, setEntries] = useState<WhitelistedAddress[]>([]);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState(false);
 
   const [addr, setAddr] = useState("");
   const [label, setLabel] = useState("");
@@ -52,12 +54,11 @@ export default function WhitelistPage({
       .catch(() => setEntries([]));
   }, [token, id]);
 
-  async function handleToggle() {
+  async function applyToggle(next: boolean) {
     if (!token) return;
     setError(null);
     setToggling(true);
     try {
-      const next = !enabled;
       const res = await setWhitelistEnabled(token, id, next);
       setEnabled(res.enabled);
     } catch (e) {
@@ -65,6 +66,23 @@ export default function WhitelistPage({
     } finally {
       setToggling(false);
     }
+  }
+
+  function handleToggle() {
+    if (!token) return;
+    // Disabling is an anti-fraud control change — require a deliberate second step.
+    if (enabled) {
+      setConfirmDisable(true);
+      return;
+    }
+    // Enabling with no entries would block every withdrawal — warn instead of silently arming it.
+    if (entries.length === 0) {
+      setError(
+        "Add at least one address before enabling the allowlist — enabling it empty blocks every withdrawal."
+      );
+      return;
+    }
+    void applyToggle(true);
   }
 
   async function handleAdd(e: FormEvent) {
@@ -209,63 +227,76 @@ export default function WhitelistPage({
                   />
                 </div>
                 <ActionButton
-                  label={adding ? "Adding…" : "+ Add"}
-                  disabled={!addr.trim() || adding}
+                  label={adding ? "Adding…" : "Add address"}
+                  type="submit"
                   loading={adding}
+                  disabled={!addr.trim()}
                 />
               </form>
             </Panel>
 
-            <Panel title={`${entries.length} whitelisted address${entries.length === 1 ? "" : "es"}`}>
+            <Panel title="Whitelisted addresses">
               {entries.length === 0 ? (
-                <Empty>No addresses whitelisted yet.</Empty>
+                <Empty
+                  title="No addresses yet"
+                  body="Add at least one destination before enabling the allowlist."
+                />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
-                        <th className="pb-3 pr-4 font-medium">Address</th>
-                        <th className="pb-3 pr-4 font-medium">Label</th>
-                        <th className="pb-3 pr-4 font-medium">Added</th>
-                        <th className="pb-3 font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-divider">
-                      {entries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td className="py-3 pr-4 font-mono text-xs text-burgundy-bright">
-                            {entry.address.slice(0, 10)}…{entry.address.slice(-8)}
-                          </td>
-                          <td className="py-3 pr-4 text-foreground">
-                            {entry.label ?? <span className="text-muted">—</span>}
-                          </td>
-                          <td className="py-3 pr-4 text-muted">
-                            {new Date(entry.created_at).toLocaleDateString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </td>
-                          <td className="py-3 text-right">
-                            <button
-                              onClick={() => handleRemove(entry.id)}
-                              disabled={removingId === entry.id}
-                              className="text-xs text-muted hover:text-danger disabled:opacity-40"
-                            >
-                              {removingId === entry.id ? "Removing…" : "Remove"}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ul className="divide-y divide-border">
+                  {entries.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="flex items-center justify-between gap-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-sm text-foreground">
+                          {entry.address}
+                        </p>
+                        {entry.label && (
+                          <p className="text-xs text-muted">{entry.label}</p>
+                        )}
+                      </div>
+                      <ActionButton
+                        label={removingId === entry.id ? "Removing…" : "Remove"}
+                        onClick={() => handleRemove(entry.id)}
+                        loading={removingId === entry.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
               )}
             </Panel>
           </div>
           </main>
         </div>
       </div>
+
+      <Modal
+        open={confirmDisable}
+        onClose={() => setConfirmDisable(false)}
+        title="Disable the withdrawal allowlist?"
+      >
+        <p className="text-sm text-muted">
+          The allowlist is an anti-fraud control. Disabling it lets outbound payments
+          reach <strong className="text-foreground">any</strong> destination, including
+          ones you have not reviewed. Only continue if you intend to allow all
+          withdrawals from this wallet.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <ActionButton
+            label="Keep it enabled"
+            onClick={() => setConfirmDisable(false)}
+          />
+          <ActionButton
+            label={toggling ? "Disabling…" : "Disable allowlist"}
+            loading={toggling}
+            onClick={() => {
+              setConfirmDisable(false);
+              void applyToggle(false);
+            }}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
