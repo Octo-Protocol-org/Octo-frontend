@@ -12,6 +12,8 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardHome() {
   const { user, token, loading, logout } = useAuth();
   const [wallets, setWallets] = useState<WalletView[] | null>(null);
@@ -242,25 +244,12 @@ function ManageMenu({ walletId }: { walletId: string }) {
 
       {open && (
         <>
-          {/* click-away */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-popover backdrop-blur-md">
-            <Link
-              href={`/dashboard/wallets/${walletId}`}
-              className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
-            >
-              ▦ Go to dashboard
-            </Link>
-            <Link
-              href={`/dashboard/wallets/${walletId}/api`}
-              className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
-            >
-              ↗ API settings
-            </Link>
-          </div>
+          <Link
+            href={`/dashboard/wallets/${walletId}`}
+            className="absolute right-0 top-full z-10 mt-1 block w-40 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground hover:border-border-strong"
+          >
+            Open wallet
+          </Link>
         </>
       )}
     </div>

@@ -43,17 +43,17 @@ export function proxy(request: NextRequest) {
   const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
   const img = `img-src 'self' blob: data: ${CLOUDINARY_CDN}`;
 
-  // The signing surface (dashboard) handles decrypted keys, so it gets a strict, nonce-based CSP
-  // with no `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each
-  // page's `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its
-  // scripts. Marketing/login/docs pages handle no keys and stay static, so they get a lighter CSP
-  // that does not require a nonce (a nonce would block their prerendered scripts).
+  // The authenticated dashboard handles decrypted keys and the encrypted key backups in
+  // localStorage, so every /dashboard/* route gets a strict, nonce-based CSP with no
+  // `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each page's
+  // `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its scripts.
+  // Marketing/login/docs pages handle no keys and stay static, so they get a lighter CSP that
+  // does not require a nonce (a nonce would block their prerendered scripts).
   const pathname = request.nextUrl.pathname;
-  // The strict CSP applies to routes that actually decrypt/handle a private key in the browser:
-  // wallet creation (keygen) and the per-wallet page (withdraw/trustline signing). Other
-  // dashboard pages (overview, audit, sponsorship) only read data and use the lighter CSP.
-  // Matches /dashboard/wallets/new (keygen) and /dashboard/wallets/<id>/* (signing).
-  const isSigningSurface = /^\/dashboard\/wallets\/[^/]+/.test(pathname);
+  // The strict CSP applies to the whole authenticated dashboard: overview, settings, audit,
+  // sponsorship, wallet creation (keygen) and the per-wallet page (withdraw/trustline signing).
+  // An XSS on any of these pages could read the session token and the encrypted key backups.
+  const isSigningSurface = /^\/dashboard(\/|$)/.test(pathname);
 
   const requestHeaders = new Headers(request.headers);
   let csp: string;
