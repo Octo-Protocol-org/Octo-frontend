@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemedToaster } from "@/components/ThemedToaster";
@@ -27,11 +28,13 @@ export const metadata: Metadata = {
     "Octo is Wallet-as-a-Service for stablecoins on Stellar: master wallets, dedicated deposit addresses, real-time deposits, and withdrawals — all from one API.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The proxy sets a per-request nonce; reuse it so the inline theme script is allowed under the strict CSP.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -40,7 +43,7 @@ export default function RootLayout({
     >
       <head>
         {/* Blocking, before first paint — otherwise every load flashes the default theme first. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>

@@ -47,13 +47,17 @@ export function proxy(request: NextRequest) {
   // localStorage, so every /dashboard/* route gets a strict, nonce-based CSP with no
   // `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each page's
   // `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its scripts.
-  // Marketing/login/docs pages handle no keys and stay static, so they get a lighter CSP that
-  // does not require a nonce (a nonce would block their prerendered scripts).
+  // The public checkout (/pay/*) builds transactions and talks to Freighter, so it is the most
+  // attacker-facing page and gets the same strict policy. Marketing/login/docs pages handle no
+  // keys and stay static, so they get a lighter CSP that does not require a nonce (a nonce would
+  // block their prerendered scripts).
   const pathname = request.nextUrl.pathname;
-  // The strict CSP applies to the whole authenticated dashboard: overview, settings, audit,
-  // sponsorship, wallet creation (keygen) and the per-wallet page (withdraw/trustline signing).
-  // An XSS on any of these pages could read the session token and the encrypted key backups.
-  const isSigningSurface = /^\/dashboard(\/|$)/.test(pathname);
+  // The strict CSP applies to the whole authenticated dashboard (overview, settings, audit,
+  // sponsorship, wallet creation/keygen and the per-wallet page with withdraw/trustline signing)
+  // and to the public checkout, where an XSS could tamper with the transaction or the payer's
+  // details before signing.
+  const isSigningSurface =
+    /^\/dashboard(\/|$)/.test(pathname) || /^\/pay(\/|$)/.test(pathname);
 
   const requestHeaders = new Headers(request.headers);
   let csp: string;
