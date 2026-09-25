@@ -14,6 +14,9 @@ import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { CopyButton } from "@/components/CopyButton";
+import { Modal } from "@/components/dashboard/Modal";
+import { ApiError } from "@/lib/api";
+import { toast } from "sonner";
 
 export const dynamic = "force-dynamic";
 
@@ -30,29 +33,37 @@ export default function DevelopersPage({
   const [fullKey, setFullKey] = useState<string | null>(null); // shown once after generate
   const [revealed, setRevealed] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [confirmingRegen, setConfirmingRegen] = useState(false);
+  const [keyLoadFailed, setKeyLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     getWallet(token, id).then(setWallet).catch(() => {});
-    getApiKey(token, id).then(setKeyInfo).catch(() => {});
+    getApiKey(token, id)
+      .then(setKeyInfo)
+      .catch(() => setKeyLoadFailed(true));
   }, [token, id]);
 
-  async function onGenerate() {
+  // Until key status is known we can't tell "generate" from "regenerate", so block the action.
+  function onGenerateClick() {
+    if (!keyInfo || generating) return;
+    if (keyInfo.configured) setConfirmingRegen(true);
+    else void generate();
+  }
+
+  async function generate() {
     if (!token) return;
-    if (
-      keyInfo?.configured &&
-      !confirm(
-        "Regenerating will invalidate the current API key. Continue?",
-      )
-    ) {
-      return;
-    }
+    setConfirmingRegen(false);
     setGenerating(true);
     try {
       const res = await generateApiKey(token, id);
       setFullKey(res.api_key);
       setRevealed(true);
       setKeyInfo({ wallet_id: id, configured: true, prefix: res.prefix });
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to generate API key.",
+      );
     } finally {
       setGenerating(false);
     }
@@ -107,7 +118,8 @@ export default function DevelopersPage({
                 <div className="flex flex-wrap items-center gap-2">
                   <ActionBtn
                     label={generating ? "Generating…" : keyInfo?.configured ? "Regenerate API Key" : "Generate API Key"}
-                    onClick={onGenerate}
+                    onClick={onGenerateClick}
+                    disabled={!keyInfo || generating}
                     primary
                   />
                   <span className="flex items-center gap-2 text-sm text-muted">
@@ -118,6 +130,13 @@ export default function DevelopersPage({
                   </span>
                 </div>
               </div>
+
+              {keyLoadFailed && (
+                <div role="alert" className="mt-6 rounded-xl border border-burgundy/40 bg-burgundy/10 p-4 text-sm text-burgundy-bright">
+                  Couldn&apos;t load this wallet&apos;s API key status. Refresh the page to
+                  try again.
+                </div>
+              )}
 
               {/* one-time key banner */}
               {fullKey && (
@@ -192,7 +211,81 @@ export default function DevelopersPage({
           </main>
         </div>
       </div>
+
+      {confirmingRegen && (
+        <RegenerateKeyModal
+          walletName={wallet?.label?.trim() || "regenerate"}
+          onConfirm={generate}
+          onClose={() => setConfirmingRegen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Regenerating kills the live key instantly, so the user must type the wallet name to proceed. */
+function RegenerateKeyModal({
+  walletName,
+  onConfirm,
+  onClose,
+}: {
+  walletName: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const matches = typed.trim() === walletName;
+
+  return (
+    <Modal title="Regenerate API key?" onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (matches) onConfirm();
+        }}
+      >
+        <div className="space-y-2 text-sm text-muted">
+          <p>
+            The current key for <strong className="text-foreground">{walletName}</strong>{" "}
+            stops working <strong className="text-foreground">immediately</strong>. Every
+            integration using it will fail until you deploy the new key.
+          </p>
+          <p>This can&apos;t be undone, and the new key is shown only once.</p>
+        </div>
+        <label
+          htmlFor="regen-confirm"
+          className="mt-5 block text-sm font-medium text-foreground"
+        >
+          Type <span className="font-mono text-burgundy-bright">{walletName}</span> to
+          confirm
+        </label>
+        <input
+          id="regen-confirm"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-2 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground focus:border-burgundy-bright focus:outline-none"
+        />
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-sunken"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!matches}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Regenerate key
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -235,19 +328,22 @@ function ActionBtn({
   label,
   onClick,
   primary,
+  disabled,
 }: {
   label: string;
   onClick: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={
+      disabled={disabled}
+      className={`disabled:cursor-not-allowed disabled:opacity-60 ${
         primary
           ? "rounded-lg bg-burgundy px-4 py-2 text-sm font-medium text-foreground hover:bg-burgundy-bright"
           : "rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-foreground"
-      }
+      }`}
     >
       {label}
     </button>

@@ -5,6 +5,7 @@ import {
   listSponsoredTransactions,
   type SponsoredTransaction,
 } from "@/lib/sponsorship";
+import { asAuthToken, asWalletId } from "@/lib/sdk/client";
 import { stroopsToAmount } from "@/lib/wallets";
 import { CopyButton } from "@/components/CopyButton";
 
@@ -27,7 +28,7 @@ export function SponsoredTransactionsTable({
 
   useEffect(() => {
     let active = true;
-    listSponsoredTransactions(walletId, token)
+    listSponsoredTransactions(asAuthToken(token), asWalletId(walletId))
       .then((page) => {
         if (!active) return;
         setRows(page.data);
@@ -43,7 +44,7 @@ export function SponsoredTransactionsTable({
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await listSponsoredTransactions(walletId, token, cursor);
+      const page = await listSponsoredTransactions(asAuthToken(token), asWalletId(walletId), cursor);
       // Append — never replace the existing rows.
       setRows((prev) => [...(prev ?? []), ...page.data]);
       setCursor(page.next_cursor);

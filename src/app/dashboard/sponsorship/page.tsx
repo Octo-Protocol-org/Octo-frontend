@@ -9,6 +9,7 @@ import {
   stroopsToXlm,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
+import { asAuthToken, asWalletId } from "@/lib/sdk/client";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
@@ -28,7 +29,7 @@ export default function SponsorshipPage() {
         // Only the sponsorship config is fetched per wallet — not full wallet details.
         const configs = await Promise.all(
           wallets.map((w) =>
-            getSponsorshipConfig(w.id, token).catch(() => null),
+            getSponsorshipConfig(asAuthToken(token), asWalletId(w.id)).catch(() => null),
           ),
         );
         return wallets.map((wallet, i) => ({ wallet, config: configs[i] }));

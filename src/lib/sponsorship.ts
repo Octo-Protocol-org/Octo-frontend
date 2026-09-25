@@ -2,7 +2,7 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
 
 /** Branded string so a token can never be passed where a wallet ID is expected. */
 export type AuthToken = string & { __brand: "AuthToken" };
@@ -26,7 +26,7 @@ export type SponsorshipConfigPayload = {
 
 /** Fetch the gas sponsorship config for a single wallet. */
 export function getSponsorshipConfig(token: AuthToken, walletId: WalletId) {
-  return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
+  return apiFetch<SponsorshipConfig>(path`/v1/wallets/${walletId}/sponsorship`, {
     token,
   });
 }
@@ -37,7 +37,7 @@ export function updateSponsorshipConfig(
   walletId: WalletId,
   payload: SponsorshipConfigPayload,
 ) {
-  return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
+  return apiFetch<SponsorshipConfig>(path`/v1/wallets/${walletId}/sponsorship`, {
     method: "PUT",
     token,
     body: JSON.stringify(payload),
@@ -73,7 +73,7 @@ export function listSponsoredTransactions(
   const params = new URLSearchParams({ limit: "50" });
   if (cursor) params.set("before", cursor);
   return apiFetch<SponsoredTxnPage>(
-    `/v1/wallets/${walletId}/sponsored-transactions?${params.toString()}`,
+    path`/v1/wallets/${walletId}/sponsored-transactions` + `?${params.toString()}`,
     { token },
   );
 }
