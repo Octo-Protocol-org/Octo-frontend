@@ -198,6 +198,15 @@ export default function PayPage({
 
       // Sequence must be the PAYER's own (it's the tx source), not the merchant's.
       const info = await getPublicSigningInfo(slug, access.address);
+
+      // Verify Freighter is on the same network before touching the transaction.
+      const networkDetails = await freighter.getNetworkDetails();
+      if (networkDetails.error || networkDetails.networkPassphrase !== info.network_passphrase) {
+        const expected = info.network_passphrase.includes("Public")
+          ? "Stellar Mainnet"
+          : "Stellar Testnet";
+        throw new Error(`Switch Freighter to ${expected} and try again.`);
+      }
       const unsignedXdr = buildUnsignedPayment(access.address, info, {
         destination: intent.deposit_address,
         amount: usdcStroopsToAmount(intent.amount_usdc_stroops),

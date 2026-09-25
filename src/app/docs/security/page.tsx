@@ -73,9 +73,52 @@ export default function Security() {
       <Callout type="note">
         Trade-off of true non-custodial: if you lose <strong>both</strong> your
         password and your recovery phrase, your funds are unrecoverable — Octo
-        cannot reset them for you. Report vulnerabilities responsibly — do not
-        open public issues for security reports.
+        cannot reset them for you.
       </Callout>
+
+      <h2>Reporting a vulnerability</h2>
+      <p>
+        Do not open a public issue for security reports. Use one of the private
+        channels below:
+      </p>
+      <ul>
+        <li>
+          <a
+            href="https://github.com/Octo-Protocol-org/Octo-frontend/security/advisories/new"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub private vulnerability reporting
+          </a>
+        </li>
+        <li>
+          Email:{" "}
+          <a href="mailto:security@octoprotocol.org">
+            security@octoprotocol.org
+          </a>
+        </li>
+        <li>
+          <a
+            href="/.well-known/security.txt"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            /.well-known/security.txt
+          </a>{" "}
+          (RFC 9116)
+        </li>
+      </ul>
+      <p>
+        Full scope, response times, and disclosure policy are in the{" "}
+        <a
+          href="https://github.com/Octo-Protocol-org/Octo-frontend/blob/main/SECURITY.md"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          SECURITY.md
+        </a>{" "}
+        at the root of the repository.
+      </p>
     </Prose>
   );
 }
