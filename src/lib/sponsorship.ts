@@ -3,6 +3,7 @@
 "use client";
 
 import { apiFetch, path } from "./api";
+import { formatStroops } from "./amount";
 
 /** Branded string so a token can never be passed where a wallet ID is expected. */
 export type AuthToken = string & { __brand: "AuthToken" };
@@ -79,9 +80,9 @@ export function listSponsoredTransactions(
 }
 
 /**
- * Format integer stroops as a human-readable XLM string (2 dp).
- * Raw stroop values are for the API only — never expose them to end users.
+ * Format integer stroops as a human-readable XLM string (up to 7 dp, trailing zeros trimmed).
+ * Stellar fees are tiny (base fee 100 stroops = 0.00001 XLM), so rounding to 2 dp hid them.
  */
 export function stroopsToXlm(stroops: number): string {
-  return `${(stroops / 10_000_000).toFixed(2)} XLM`;
+  return `${formatStroops(stroops)} XLM`;
 }

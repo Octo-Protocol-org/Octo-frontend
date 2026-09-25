@@ -29,7 +29,18 @@ export type SigningInfo = {
   sequence: string;
   network_passphrase: string;
   base_fee_stroops: number;
+  /** Network base reserve in stroops (0.5 XLM today). Optional until every backend sends it. */
+  base_reserve_stroops?: number;
+  /** Trustlines, offers, signers and data entries — each locks one base reserve. */
+  subentry_count?: number;
+  /** Reserves this account pays for others (adds to its minimum balance). */
+  num_sponsoring?: number;
+  /** Reserves others pay for this account (subtracts from its minimum balance). */
+  num_sponsored?: number;
 };
+
+/** How long a signed envelope stays valid; after this the network returns `tx_too_late`. */
+export const TX_TIMEOUT_SECONDS = 180;
 
 /** stellar-base wants fees in stroops as a string, and the sequence pre-increment handled for us. */
 function newBuilder(sourceAccount: string, info: SigningInfo) {
@@ -63,10 +74,41 @@ export function buildSignedPayment(
         amount: params.amount,
       }),
     )
-    .setTimeout(180)
+    .setTimeout(TX_TIMEOUT_SECONDS)
     .build();
   tx.sign(keypair);
   return tx.toXDR();
+}
+
+/**
+ * Build + sign a CreateAccount, used when an XLM withdrawal targets an account that doesn't exist
+ * yet (a plain payment would fail with `op_no_destination`). `destination` must be a G... address;
+ * `startingBalance` must be at least 2 base reserves (1 XLM today) or the op fails on-chain.
+ */
+export function buildSignedCreateAccount(
+  keypair: Keypair,
+  info: SigningInfo,
+  params: { destination: string; startingBalance: string },
+): string {
+  const tx = newBuilder(keypair.publicKey(), info)
+    .addOperation(
+      Operation.createAccount({
+        destination: params.destination,
+        startingBalance: params.startingBalance,
+      }),
+    )
+    .setTimeout(TX_TIMEOUT_SECONDS)
+    .build();
+  tx.sign(keypair);
+  return tx.toXDR();
+}
+
+/** Unix ms after which the network rejects this envelope, read from its own timebounds. */
+export function txExpiresAt(xdr: string, networkPassphrase: string): number | null {
+  const tx = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  const inner = "innerTransaction" in tx ? tx.innerTransaction : tx;
+  const maxTime = Number(inner.timeBounds?.maxTime ?? 0);
+  return maxTime > 0 ? maxTime * 1000 : null;
 }
 
 /**
@@ -93,7 +135,7 @@ export function buildUnsignedPayment(
         amount: params.amount,
       }),
     )
-    .setTimeout(180)
+    .setTimeout(TX_TIMEOUT_SECONDS)
     .build();
   return tx.toXDR();
 }
@@ -111,7 +153,7 @@ export function buildSignedChangeTrust(
         ...(params.limit ? { limit: params.limit } : {}),
       }),
     )
-    .setTimeout(180)
+    .setTimeout(TX_TIMEOUT_SECONDS)
     .build();
   tx.sign(keypair);
   return tx.toXDR();

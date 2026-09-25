@@ -23,10 +23,28 @@ import {
   submitSigned,
   requestWithdrawOtp,
   confirmWithdraw,
+  getAccountExists,
   buildSignedPayment,
   buildSignedChangeTrust,
+  buildSignedCreateAccount,
+  txExpiresAt,
+  TX_TIMEOUT_SECONDS,
+  type SigningInfo,
   type SubmitResult,
 } from "@/lib/sdk";
+import { parseAmount, formatStroops } from "@/lib/amount";
+import {
+  validateStellarAddress,
+  getStellarAddressKind,
+  baseAccountOf,
+} from "@/lib/stellar/address";
+import {
+  minimumBalanceStroops,
+  spendableNativeStroops,
+  minCreateAccountStroops,
+  reserveIsExact,
+} from "@/lib/stellar/reserve";
+import { friendlyResultMessage, isExpiredResult } from "@/lib/stellar/resultCodes";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
@@ -318,6 +336,7 @@ export default function WalletOverview({
         <WithdrawModal
           token={token}
           walletId={id}
+          walletAddress={wallet?.address}
           balances={balances}
           onClose={() => setShowWithdraw(false)}
           onDone={() => {
@@ -392,6 +411,8 @@ function TrustlineModal({
       setError(message);
       toast.error(message);
     } finally {
+      // The password is only needed for the instant of signing; never keep it around.
+      setPassword("");
       setSubmitting(false);
     }
   }
@@ -538,33 +559,43 @@ type WithdrawAsset = {
   asset?: { code: string; issuer: string };
 };
 
+/** Stop accepting the code this long before maxTime so the relay can still reach the network. */
+const EXPIRY_MARGIN_MS = 10_000;
+
+function formatCountdown(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function WithdrawModal({
   token,
   walletId,
+  walletAddress,
   balances,
   onClose,
   onDone,
 }: {
   token: string;
   walletId: string;
+  walletAddress?: string;
   balances: Balance[];
   onClose: () => void;
   onDone: () => void;
 }) {
   // Build the selectable asset list: XLM first, then any credit asset the
   // wallet holds a trustline for (USDC, etc.).
+  const trustlines = balances.filter(
+    (b) => b.asset_type !== "native" && b.asset_code && b.asset_issuer,
+  );
   const assets: WithdrawAsset[] = [
     {
       code: "XLM",
       available: balances.find((b) => b.asset_type === "native")?.balance ?? "0",
     },
-    ...balances
-      .filter((b) => b.asset_type !== "native" && b.asset_code && b.asset_issuer)
-      .map((b) => ({
-        code: b.asset_code as string,
-        available: b.balance,
-        asset: { code: b.asset_code as string, issuer: b.asset_issuer as string },
-      })),
+    ...trustlines.map((b) => ({
+      code: b.asset_code as string,
+      available: b.balance,
+      asset: { code: b.asset_code as string, issuer: b.asset_issuer as string },
+    })),
   ];
 
   const [selectedCode, setSelectedCode] = useState(assets[0].code);
@@ -577,18 +608,69 @@ function WithdrawModal({
   // Once the transaction is signed, it's held here awaiting OTP confirmation before it ever relays.
   const [pendingXdr, setPendingXdr] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // Reserve/fee params for the spendable-XLM calculation; null until loaded (defaults apply).
+  const [reserveInfo, setReserveInfo] = useState<SigningInfo | null>(null);
+  // Whether the signed tx creates the destination account (unfunded XLM destination).
+  const [createsAccount, setCreatesAccount] = useState(false);
+  // Countdown state for the signed envelope's time window.
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const [networkExpired, setNetworkExpired] = useState(false);
+  const [resigning, setResigning] = useState(false);
 
   const selected =
     assets.find((a) => a.code === selectedCode) ?? assets[0];
 
+  useEffect(() => {
+    getSigningInfo(token, walletId).then(setReserveInfo).catch(() => {});
+  }, [token, walletId]);
+
+  // Tick once a second while a signed transaction is waiting for its code.
+  useEffect(() => {
+    if (expiresAt === null) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+
+  const secondsLeft =
+    expiresAt === null
+      ? 0
+      : Math.max(0, Math.floor((expiresAt - EXPIRY_MARGIN_MS - now) / 1000));
+  const expired = networkExpired || (expiresAt !== null && secondsLeft <= 0);
+
+  const availableStroops = (() => {
+    const p = parseAmount(selected.available);
+    return p.ok ? p.stroops : BigInt(0);
+  })();
+  const spendableStroops = selected.asset
+    ? availableStroops
+    : spendableNativeStroops(availableStroops, reserveInfo, trustlines.length);
+  const reserveStroops = selected.asset
+    ? null
+    : minimumBalanceStroops(reserveInfo, trustlines.length);
+
+  // Everything checkable without the password, so bad input never reaches the unlock/sign step.
+  function validate(): { error: string } | { stroops: bigint } {
+    const addrError = validateStellarAddress(destination, { ownAddress: walletAddress });
+    if (addrError) return { error: addrError };
+    const parsed = parseAmount(amount);
+    if (!parsed.ok) return { error: parsed.error };
+    if (parsed.stroops <= BigInt(0)) return { error: "Enter an amount greater than 0." };
+    if (parsed.stroops > spendableStroops) {
+      return {
+        error: selected.asset
+          ? `You can send at most ${formatStroops(spendableStroops)} ${selected.code}.`
+          : `You can send at most ${formatStroops(spendableStroops)} XLM — the rest covers Stellar's minimum reserve and the network fee.`,
+      };
+    }
+    return { stroops: parsed.stroops };
+  }
+
   async function requestOtp() {
     setError(null);
-    if (!destination.startsWith("G") && !destination.startsWith("M")) {
-      setError("Destination must be a Stellar address (G… or M…).");
-      return;
-    }
-    if (!(Number(amount) > 0)) {
-      setError("Enter a valid amount greater than 0.");
+    const checked = validate();
+    if ("error" in checked) {
+      setError(checked.error);
       return;
     }
     if (!password) {
@@ -597,27 +679,63 @@ function WithdrawModal({
     }
     setSubmitting(true);
     try {
+      // Unfunded destinations can't receive a plain payment (op_no_destination); null = unknown.
+      const exists = await getAccountExists(token, walletId, baseAccountOf(destination))
+        .then((r) => r.exists)
+        .catch(() => null);
+      const needsCreate = exists === false;
+      if (needsCreate && selected.asset) {
+        setError(
+          `This address isn't activated on Stellar yet, so it can't hold ${selected.code}. Ask the recipient to fund it with XLM and add a ${selected.code} trustline first.`,
+        );
+        return;
+      }
+      if (needsCreate && getStellarAddressKind(destination) === "med25519") {
+        setError(
+          "This muxed (M…) address belongs to an account that isn't activated yet. Send at least 1 XLM to its base G… address first.",
+        );
+        return;
+      }
+      if (needsCreate && checked.stroops < minCreateAccountStroops(reserveInfo)) {
+        setError(
+          `This address isn't activated on Stellar yet. Send at least ${formatStroops(minCreateAccountStroops(reserveInfo))} XLM to create it.`,
+        );
+        return;
+      }
+
       // Unlock and sign locally — the private key never leaves this device. Only after signing
       // do we ask the server to email an OTP bound to this exact transaction.
       const keypair = await unlockWallet(token, walletId, password);
       const info = await getSigningInfo(token, walletId);
-      const signedXdr = buildSignedPayment(keypair, info, {
-        destination,
-        amount, // decimal string, e.g. "1.5"
-        asset: selected.asset, // undefined => XLM
-      });
+      const normalized = formatStroops(checked.stroops);
+      const signedXdr = needsCreate
+        ? buildSignedCreateAccount(keypair, info, {
+            destination,
+            startingBalance: normalized,
+          })
+        : buildSignedPayment(keypair, info, {
+            destination,
+            amount: normalized,
+            asset: selected.asset, // undefined => XLM
+          });
       await requestWithdrawOtp(token, walletId, signedXdr);
+      setCreatesAccount(needsCreate);
+      setReserveInfo(info);
+      setNow(Date.now());
+      setExpiresAt(txExpiresAt(signedXdr, info.network_passphrase));
+      setNetworkExpired(false);
+      setResigning(false);
       setPendingXdr(signedXdr);
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Withdrawal failed.";
+      const message = friendlyResultMessage(
+        err instanceof Error ? err.message : null,
+        "Withdrawal failed.",
+      );
       setError(message);
       toast.error(message);
     } finally {
+      // The password is only needed for the instant of signing; never keep it around.
+      setPassword("");
       setSubmitting(false);
     }
   }
@@ -625,6 +743,7 @@ function WithdrawModal({
   async function confirm() {
     if (!pendingXdr) return;
     setError(null);
+    if (expired) return;
     if (code.length !== 6) {
       setError("Enter the 6-digit code from your email.");
       return;
@@ -632,17 +751,36 @@ function WithdrawModal({
     setSubmitting(true);
     try {
       const res = await confirmWithdraw(token, walletId, pendingXdr, code);
+      if (res.status !== "confirmed" && isExpiredResult(res.detail)) {
+        setNetworkExpired(true);
+        return;
+      }
       setResult(res);
       if (res.status !== "confirmed") {
-        toast.error(res.detail ?? "The withdrawal was not confirmed.");
+        toast.error(friendlyResultMessage(res.detail, "The withdrawal was not confirmed."));
       }
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Invalid or expired code.";
+      const raw = err instanceof ApiError ? err.message : null;
+      if (isExpiredResult(raw)) {
+        setNetworkExpired(true);
+        return;
+      }
+      const message = friendlyResultMessage(raw, "Invalid or expired code.");
       setError(message);
       toast.error(message);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Drop the signed envelope and return to the form, keeping destination + amount.
+  function discardSigned(resign: boolean) {
+    setPendingXdr(null);
+    setExpiresAt(null);
+    setNetworkExpired(false);
+    setCode("");
+    setError(null);
+    setResigning(resign);
   }
 
   if (result) {
@@ -657,8 +795,10 @@ function WithdrawModal({
           <p className="mt-2 font-medium capitalize text-foreground">
             {result.status}
           </p>
-          {!ok && result.detail && (
-            <p className="mt-1 text-sm text-muted">{result.detail}</p>
+          {!ok && (
+            <p className="mt-1 text-sm text-muted">
+              {friendlyResultMessage(result.detail, "The withdrawal could not be completed.")}
+            </p>
           )}
           {result.stellar_tx_hash && (
             <a
@@ -682,6 +822,30 @@ function WithdrawModal({
     );
   }
 
+  if (pendingXdr && expired) {
+    return (
+      <Modal title="Withdrawal expired" onClose={onClose}>
+        <div className="text-center">
+          <p className="text-3xl text-warning">!</p>
+          <p className="mt-2 text-sm text-muted">
+            For your security, a signed withdrawal is only valid for{" "}
+            {Math.round(TX_TIMEOUT_SECONDS / 60)} minutes, and this one ran out before
+            the code was confirmed. <span className="text-foreground">Nothing was sent.</span>
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Sign again with your password and we&apos;ll email you a new code.
+          </p>
+          <button
+            onClick={() => discardSigned(true)}
+            className="mt-6 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold"
+          >
+            Sign again
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
   if (pendingXdr) {
     return (
       <Modal title="Verify withdrawal" onClose={onClose}>
@@ -692,8 +856,21 @@ function WithdrawModal({
           </span>
           .
         </p>
+        {createsAccount && (
+          <p className="mt-2 text-center text-xs text-muted">
+            This address isn&apos;t activated yet — this withdrawal will create it.
+          </p>
+        )}
 
-        <div className="mt-5">
+        <p
+          className={`mt-3 text-center text-xs ${secondsLeft <= 30 ? "text-warning" : "text-muted"}`}
+          aria-live="polite"
+        >
+          Expires in{" "}
+          <span className="font-mono text-foreground">{formatCountdown(secondsLeft)}</span>
+        </p>
+
+        <div className="mt-4">
           <OtpInput value={code} onChange={setCode} disabled={submitting} />
         </div>
 
@@ -711,11 +888,7 @@ function WithdrawModal({
           {submitting ? "Confirming…" : "Verify & withdraw"}
         </button>
         <button
-          onClick={() => {
-            setPendingXdr(null);
-            setCode("");
-            setError(null);
-          }}
+          onClick={() => discardSigned(false)}
           className="mt-3 w-full text-center text-xs text-muted hover:text-foreground"
         >
           Back
@@ -733,6 +906,22 @@ function WithdrawModal({
         </span>
         .
       </p>
+      {reserveStroops !== null && (
+        <p className="mt-1 text-xs text-muted">
+          Spendable:{" "}
+          <span className="text-foreground">{formatStroops(spendableStroops)} XLM</span>{" "}
+          ({reserveIsExact(reserveInfo) ? "" : "about "}
+          {formatStroops(reserveStroops)} XLM stays as Stellar&apos;s minimum reserve, plus the
+          network fee).
+        </p>
+      )}
+
+      {resigning && (
+        <p className="mt-4 rounded-lg border border-border bg-surface-sunken px-3 py-2 text-xs text-muted">
+          Your previous signature expired. Re-enter your password to sign a fresh withdrawal —
+          we&apos;ll email a new code.
+        </p>
+      )}
 
       <div className="mt-5 space-y-4">
         <div>
@@ -769,7 +958,17 @@ function WithdrawModal({
           />
         </div>
         <div>
-          <label className="text-xs text-muted">Amount ({selected.code})</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-muted">Amount ({selected.code})</label>
+            <button
+              type="button"
+              onClick={() => setAmount(formatStroops(spendableStroops))}
+              disabled={spendableStroops <= BigInt(0)}
+              className="text-xs text-burgundy-bright hover:underline disabled:opacity-50"
+            >
+              Max
+            </button>
+          </div>
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -789,7 +988,8 @@ function WithdrawModal({
             className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
           <p className="mt-1 text-[11px] text-muted">
-            Signs locally on this device — your key never leaves the browser.
+            Signs locally on this device — your key never leaves the browser. After signing you
+            have {Math.round(TX_TIMEOUT_SECONDS / 60)} minutes to enter the emailed code.
           </p>
         </div>
 
@@ -804,7 +1004,7 @@ function WithdrawModal({
           disabled={submitting}
           className="w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
         >
-          {submitting ? "Signing…" : "Withdraw"}
+          {submitting ? "Signing…" : resigning ? "Sign again" : "Withdraw"}
         </button>
       </div>
     </Modal>
