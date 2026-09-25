@@ -8,8 +8,8 @@
  */
 import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { hmac } from "@noble/hashes/hmac";
-import { sha512 } from "@noble/hashes/sha512";
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha512 } from "@noble/hashes/sha2.js";
 import { Keypair } from "@stellar/stellar-base";
 
 // SLIP-0010 ed25519 master-key salt (fixed by the spec).

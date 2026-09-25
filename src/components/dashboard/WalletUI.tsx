@@ -31,14 +31,17 @@ export function ActionButton({
   onClick,
   disabled,
   loading,
+  type,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   loading?: boolean;
+  type?: "button" | "submit";
 }) {
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled || loading}
       className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-4 py-2 text-sm text-foreground transition-colors hover:border-burgundy/50 disabled:cursor-not-allowed disabled:opacity-40"

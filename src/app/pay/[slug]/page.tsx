@@ -9,7 +9,6 @@ import {
   getPaymentStatus,
   getPublicSigningInfo,
   submitPublicPayment,
-  usdcStroopsToAmount,
   usdAmountToStroops,
   isValidEmail,
   type PublicPaymentLink,
@@ -20,6 +19,7 @@ import { USDC_TESTNET } from "@/lib/wallets";
 import { buildUnsignedPayment } from "@/lib/sdk";
 import { OctoSpinner } from "@/components/OctoSpinner";
 import confetti from "canvas-confetti";
+import { formatStroops } from "@/lib/amount";
 
 type Step = "loading" | "not-found" | "form" | "pay" | "confirmed";
 
@@ -101,7 +101,7 @@ export default function PayPage({
       .then((l) => {
         setLink(l);
         if (l.amount_usdc_stroops !== null) {
-          setAmount(usdcStroopsToAmount(l.amount_usdc_stroops));
+          setAmount(formatStroops(l.amount_usdc_stroops));
         }
         finish("form");
       })
@@ -303,7 +303,7 @@ export default function PayPage({
       }
       const unsignedXdr = buildUnsignedPayment(access.address, info, {
         destination: intent.deposit_address,
-        amount: usdcStroopsToAmount(intent.amount_usdc_stroops),
+        amount: formatStroops(intent.amount_usdc_stroops),
         asset: USDC_TESTNET,
       });
 
@@ -348,9 +348,9 @@ export default function PayPage({
               <p className="text-sm text-muted">Pay {link.name}</p>
               <p className="mt-2 text-4xl font-semibold text-foreground">
                 {link.amount_usdc_stroops !== null
-                  ? `$${usdcStroopsToAmount(link.amount_usdc_stroops)}`
+                  ? `$${formatStroops(link.amount_usdc_stroops)}`
                   : step !== "form" && intent
-                    ? `$${usdcStroopsToAmount(intent.amount_usdc_stroops)}`
+                    ? `$${formatStroops(intent.amount_usdc_stroops)}`
                     : amount
                     ? `$${amount}`
                     : "$—"}
@@ -475,7 +475,7 @@ export default function PayPage({
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="text-xs text-gray-500">Amount</p>
                 <p className="mt-1 text-sm font-medium text-gray-900">
-                  ${usdcStroopsToAmount(intent.amount_usdc_stroops)}
+                  ${formatStroops(intent.amount_usdc_stroops)}
                 </p>
               </div>
 
@@ -605,11 +605,11 @@ function MismatchBanner({
     },
     underpaid: {
       title: "Amount too low",
-      body: `You sent $${usdcStroopsToAmount(status.received_usdc_stroops ?? 0)}, but $${usdcStroopsToAmount(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
+      body: `You sent $${formatStroops(status.received_usdc_stroops ?? 0)}, but $${formatStroops(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
     },
     overpaid: {
       title: "Amount too high",
-      body: `You sent $${usdcStroopsToAmount(status.received_usdc_stroops ?? 0)}, but only $${usdcStroopsToAmount(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
+      body: `You sent $${formatStroops(status.received_usdc_stroops ?? 0)}, but only $${formatStroops(status.expected_usdc_stroops)} was expected. Contact the merchant to resolve this.`,
     },
   }[status.status as "expired" | "underpaid" | "overpaid"];
 

@@ -5,11 +5,9 @@
 import { apiFetch, path } from "./api";
 import { formatStroops } from "./amount";
 
-/** Branded string so a token can never be passed where a wallet ID is expected. */
-export type AuthToken = string & { __brand: "AuthToken" };
+import type { AuthToken, WalletId } from "./brands";
 
-/** Branded string so a wallet ID can never be passed where a token is expected. */
-export type WalletId = string & { __brand: "WalletId" };
+export type { AuthToken, WalletId };
 
 export type SponsorshipConfig = {
   enabled: boolean;

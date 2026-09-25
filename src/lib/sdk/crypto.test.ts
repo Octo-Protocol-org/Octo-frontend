@@ -14,7 +14,7 @@ function toBase64(bytes: Uint8Array): string {
 function makeBackup(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     v: 1,
-    kdf: 'pbkdf2-sha256',
+    kdf: 'PBKDF2-SHA256',
     iter: 600_000,
     salt: toBase64(VALID_SALT),
     nonce: toBase64(VALID_NONCE),
@@ -27,8 +27,8 @@ describe('parseBackup', () => {
   it('parses a well-formed backup', () => {
     const backup = parseBackup(makeBackup());
     expect(backup.iter).toBe(600_000);
-    expect(backup.salt).toEqual(VALID_SALT);
-    expect(backup.nonce).toEqual(VALID_NONCE);
+    expect(backup.salt).toBe(toBase64(VALID_SALT));
+    expect(backup.nonce).toBe(toBase64(VALID_NONCE));
   });
 
   it('rejects an iter below the sane range', () => {

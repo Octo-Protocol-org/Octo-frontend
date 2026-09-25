@@ -88,6 +88,8 @@ export default function WhitelistPage({
       return "This is the wallet's own address — sending to yourself is not allowed.";
     }
     return null;
+  }
+
   function handleToggle() {
     if (!token) return;
     // Disabling is an anti-fraud control change — require a deliberate second step.
@@ -264,17 +266,14 @@ export default function WhitelistPage({
                   label={adding ? "Adding…" : "Add address"}
                   type="submit"
                   loading={adding}
-                  disabled={!addr.trim()}
+                  disabled={adding || !addr.trim()}
                 />
               </form>
             </Panel>
 
             <Panel title="Whitelisted addresses">
               {entries.length === 0 ? (
-                <Empty
-                  title="No addresses yet"
-                  body="Add at least one destination before enabling the allowlist."
-                />
+                <Empty>Add at least one destination before enabling the allowlist.</Empty>
               ) : (
                 <ul className="divide-y divide-border">
                   {entries.map((entry) => (
@@ -305,32 +304,33 @@ export default function WhitelistPage({
         </div>
       </div>
 
-      <Modal
-        open={confirmDisable}
-        onClose={() => setConfirmDisable(false)}
-        title="Disable the withdrawal allowlist?"
-      >
-        <p className="text-sm text-muted">
-          The allowlist is an anti-fraud control. Disabling it lets outbound payments
-          reach <strong className="text-foreground">any</strong> destination, including
-          ones you have not reviewed. Only continue if you intend to allow all
-          withdrawals from this wallet.
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <ActionButton
-            label="Keep it enabled"
-            onClick={() => setConfirmDisable(false)}
-          />
-          <ActionButton
-            label={toggling ? "Disabling…" : "Disable allowlist"}
-            loading={toggling}
-            onClick={() => {
-              setConfirmDisable(false);
-              void applyToggle(false);
-            }}
-          />
-        </div>
-      </Modal>
+      {confirmDisable && (
+        <Modal
+          onClose={() => setConfirmDisable(false)}
+          title="Disable the withdrawal allowlist?"
+        >
+          <p className="text-sm text-muted">
+            The allowlist is an anti-fraud control. Disabling it lets outbound payments
+            reach <strong className="text-foreground">any</strong> destination, including
+            ones you have not reviewed. Only continue if you intend to allow all
+            withdrawals from this wallet.
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <ActionButton
+              label="Keep it enabled"
+              onClick={() => setConfirmDisable(false)}
+            />
+            <ActionButton
+              label={toggling ? "Disabling…" : "Disable allowlist"}
+              loading={toggling}
+              onClick={() => {
+                setConfirmDisable(false);
+                void applyToggle(false);
+              }}
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

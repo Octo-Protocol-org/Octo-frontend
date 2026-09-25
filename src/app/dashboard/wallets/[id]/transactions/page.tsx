@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/useAuth";
 import {
   getWallet,
   listTransactionsPage,
-  stroopsToAmount,
   displayAssetCode,
   type WalletView,
   type Transaction,
@@ -17,6 +16,7 @@ import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -310,7 +310,7 @@ function TxRow({
       </td>
       <td className="py-3 pr-4 font-medium text-foreground">
         {isDeposit ? "+" : "-"}
-        {stroopsToAmount(tx.amount_stroops)} {displayAssetCode(tx.asset_code)}
+        {formatStroops(tx.amount_stroops)} {displayAssetCode(tx.asset_code)}
       </td>
       <td className="py-3 pr-4 font-mono text-xs text-muted">
         {counterparty ? `${counterparty.slice(0, 6)}…${counterparty.slice(-6)}` : "—"}
@@ -375,7 +375,7 @@ function TransactionDetail({
           <p className="text-xs text-muted">Amount</p>
           <p className="mt-1 text-xl font-semibold text-foreground">
             {isDeposit ? "+" : "-"}
-            {stroopsToAmount(tx.amount_stroops)} {displayAssetCode(tx.asset_code)}
+            {formatStroops(tx.amount_stroops)} {displayAssetCode(tx.asset_code)}
           </p>
         </div>
 

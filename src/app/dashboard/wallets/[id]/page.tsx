@@ -11,7 +11,6 @@ import {
   listTransactions,
   createAddress,
   USDC_TESTNET,
-  stroopsToAmount,
   type WalletView,
   type Balance,
   type Address,
@@ -281,7 +280,7 @@ export default function WalletOverview({
                           {t.id.slice(0, 8)}…
                         </td>
                         <td className="py-3">
-                          {stroopsToAmount(t.amount_stroops)}{" "}
+                          {formatStroops(t.amount_stroops)}{" "}
                           {t.asset_code === "native" ? "XLM" : t.asset_code}
                         </td>
                         <td className="py-3 font-mono text-xs">
@@ -553,6 +552,8 @@ function DepositModal({
 
 /** Matches the signup OTP cooldown in AuthForm. */
 const RESEND_COOLDOWN_SECS = 30;
+// Wall clock for event handlers; kept outside components so the purity lint can see it isn't render.
+const clockMs = () => Date.now();
 
 /** A withdrawable asset derived from the wallet's balances. */
 type WithdrawAsset = {
@@ -728,11 +729,12 @@ function WithdrawModal({
       await requestWithdrawOtp(token, walletId, signedXdr);
       setCreatesAccount(needsCreate);
       setReserveInfo(info);
-      setNow(Date.now());
+      const signedAt = clockMs();
+      setNow(signedAt);
       setExpiresAt(txExpiresAt(signedXdr, info.network_passphrase));
       setNetworkExpired(false);
       setResigning(false);
-      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECS * 1000);
+      setResendAvailableAt(signedAt + RESEND_COOLDOWN_SECS * 1000);
       setPendingXdr(signedXdr);
     } catch (err) {
       const message = friendlyResultMessage(

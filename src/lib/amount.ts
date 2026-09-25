@@ -36,15 +36,49 @@ export function parseAmount(input: string): ParsedAmount {
   return { ok: true, stroops };
 }
 
-// Format stroops as a decimal with up to 7 places and trailing zeros trimmed (100 -> "0.00001").
-export function formatStroops(stroops: bigint | number): string {
-  const v = typeof stroops === "bigint" ? stroops : BigInt(Math.trunc(stroops));
+// Coerce an integer stroop value to BigInt, throwing on anything that is not an exact integer.
+function toStroopBigInt(value: bigint | number | string): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") {
+    if (!Number.isInteger(value)) throw new RangeError(`Invalid stroop value: ${value}`);
+    return BigInt(value);
+  }
+  if (!/^-?\d+$/.test(value)) throw new RangeError(`Invalid stroop value: ${value}`);
+  return BigInt(value);
+}
+
+// Format stroops exactly with trailing zeros trimmed (100 -> "0.00001"), or to fixed `dp` places rounding half up.
+export function formatStroops(value: bigint | number | string, dp?: number): string {
+  const v = toStroopBigInt(value);
   const neg = v < ZERO;
   const abs = neg ? -v : v;
-  const whole = abs / STROOPS_PER_UNIT;
-  const frac = (abs % STROOPS_PER_UNIT)
-    .toString()
-    .padStart(STELLAR_DECIMALS, "0")
-    .replace(/0+$/, "");
-  return `${neg ? "-" : ""}${whole.toString()}${frac ? `.${frac}` : ""}`;
+  if (dp === undefined) {
+    const frac = (abs % STROOPS_PER_UNIT)
+      .toString()
+      .padStart(STELLAR_DECIMALS, "0")
+      .replace(/0+$/, "");
+    return `${neg ? "-" : ""}${(abs / STROOPS_PER_UNIT).toString()}${frac ? `.${frac}` : ""}`;
+  }
+  if (!Number.isInteger(dp) || dp < 0 || dp > STELLAR_DECIMALS) {
+    throw new RangeError(`Invalid decimal places: ${dp}`);
+  }
+  const step = BigInt(10) ** BigInt(STELLAR_DECIMALS - dp);
+  const scaled = (abs + step / BigInt(2)) / step;
+  const unit = BigInt(10) ** BigInt(dp);
+  const frac = dp > 0 ? `.${(scaled % unit).toString().padStart(dp, "0")}` : "";
+  return `${neg && scaled > ZERO ? "-" : ""}${(scaled / unit).toString()}${frac}`;
+}
+
+// Narrow a parsed amount to a positive JSON-safe number for the API, or null if invalid/out of range.
+export function toApiStroops(parsed: ParsedAmount): number | null {
+  if (!parsed.ok || parsed.stroops <= ZERO) return null;
+  if (parsed.stroops > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(parsed.stroops);
+}
+
+// Sum integer stroop values exactly; float addition drifts once a total passes 2^53.
+export function sumStroops(values: Iterable<bigint | number | string>): bigint {
+  let total = ZERO;
+  for (const v of values) total += toStroopBigInt(v);
+  return total;
 }

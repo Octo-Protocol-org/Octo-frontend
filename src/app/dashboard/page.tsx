@@ -9,7 +9,7 @@ import {
   getSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
-import { asAuthToken, asWalletId } from "@/lib/sdk/client";
+import { asAuthToken, asWalletId } from "@/lib/brands";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 

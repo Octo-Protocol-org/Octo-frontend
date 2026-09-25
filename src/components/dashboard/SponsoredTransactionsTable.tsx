@@ -5,8 +5,8 @@ import {
   listSponsoredTransactions,
   type SponsoredTransaction,
 } from "@/lib/sponsorship";
-import { asAuthToken, asWalletId } from "@/lib/sdk/client";
-import { stroopsToAmount } from "@/lib/wallets";
+import { asAuthToken, asWalletId } from "@/lib/brands";
+import { formatStroops, sumStroops } from "@/lib/amount";
 import { CopyButton } from "@/components/CopyButton";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -64,7 +64,7 @@ export function SponsoredTransactionsTable({
       d.getUTCMonth() === now.getUTCMonth()
     );
   });
-  const monthFeeStroops = monthRows.reduce((sum, r) => sum + r.fee_stroops, 0);
+  const monthFeeStroops = sumStroops(monthRows.map((r) => r.fee_stroops));
 
   return (
     <section className="rounded-2xl border border-border bg-burgundy-soft/30 p-5">
@@ -75,7 +75,7 @@ export function SponsoredTransactionsTable({
         <p className="text-xs text-muted">
           {monthRows.length}{" "}
           {monthRows.length === 1 ? "transaction" : "transactions"} sponsored ·{" "}
-          {stroopsToAmount(monthFeeStroops)} XLM total fees this month
+          {formatStroops(monthFeeStroops)} XLM total fees this month
         </p>
       </div>
 
@@ -112,7 +112,7 @@ export function SponsoredTransactionsTable({
                     <HashCell hash={tx.fee_bump_tx_hash} />
                   </td>
                   <td className="py-3 pr-4 whitespace-nowrap">
-                    {stroopsToAmount(tx.fee_stroops)} XLM
+                    {formatStroops(tx.fee_stroops)} XLM
                   </td>
                   <td className="py-3">
                     <StatusBadge status={tx.status} />

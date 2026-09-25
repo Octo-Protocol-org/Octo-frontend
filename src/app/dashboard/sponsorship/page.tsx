@@ -6,12 +6,12 @@ import { useAuth } from "@/lib/useAuth";
 import { listWallets, type WalletView } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
-  stroopsToXlm,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
-import { asAuthToken, asWalletId } from "@/lib/sdk/client";
+import { asAuthToken, asWalletId } from "@/lib/brands";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops } from "@/lib/amount";
 
 type WalletSponsorship = {
   wallet: WalletView;
@@ -116,7 +116,7 @@ function WalletCard({
           <dt className="text-[11px] text-muted">Max fee / tx</dt>
           <dd className="mt-0.5 text-foreground">
             {config?.per_tx_fee_cap_stroops != null
-              ? stroopsToXlm(config.per_tx_fee_cap_stroops)
+              ? `${formatStroops(config.per_tx_fee_cap_stroops, 2)} XLM`
               : "—"}
           </dd>
         </div>
@@ -124,7 +124,7 @@ function WalletCard({
           <dt className="text-[11px] text-muted">Daily budget</dt>
           <dd className="mt-0.5 text-foreground">
             {config?.daily_budget_stroops != null
-              ? stroopsToXlm(config.daily_budget_stroops)
+              ? `${formatStroops(config.daily_budget_stroops, 2)} XLM`
               : "—"}
           </dd>
         </div>
