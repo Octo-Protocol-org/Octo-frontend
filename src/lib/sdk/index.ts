@@ -14,7 +14,14 @@ export type { WalletKeys } from "./keys";
 export { encryptSeed, decryptSeed, serializeBackup, parseBackup } from "./crypto";
 export type { EncryptedBackup } from "./crypto";
 
-export { buildSignedPayment, buildSignedChangeTrust, buildUnsignedPayment } from "./tx";
+export {
+  buildSignedPayment,
+  buildSignedChangeTrust,
+  buildSignedCreateAccount,
+  buildUnsignedPayment,
+  txExpiresAt,
+  TX_TIMEOUT_SECONDS,
+} from "./tx";
 export type { SigningInfo } from "./tx";
 
 export {
@@ -23,6 +30,7 @@ export {
   getBackup,
   requestWithdrawOtp,
   confirmWithdraw,
+  getAccountExists,
 } from "./client";
 export type { SubmitResult } from "./client";
 

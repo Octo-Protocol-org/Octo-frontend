@@ -1,70 +1,67 @@
-// Branded string types so token/walletId swaps fail at compile time.
-export type AuthToken = string & { __brand: 'AuthToken' };
-export type WalletId = string & { __brand: 'WalletId' };
+/**
+ * API calls for the non-custodial flow: fetch signing info, submit a signed tx, fetch/store the
+ * encrypted backup. Thin wrappers over `apiFetch`, kept in the SDK so an external customer could
+ * use the same module.
+ */
+import { apiFetch, path } from "@/lib/api";
+import type { SigningInfo } from "./tx";
 
-export function asAuthToken(value: string): AuthToken {
-  return value as AuthToken;
+export type SubmitResult = {
+  status: string;
+  stellar_tx_hash: string | null;
+  detail?: string | null;
+};
+
+/** Fetch what the client needs to build a transaction (sequence + network params). */
+export function getSigningInfo(token: string, walletId: string) {
+  return apiFetch<SigningInfo>(path`/v1/wallets/${walletId}/signing-info`, { token });
 }
 
-export function asWalletId(value: string): WalletId {
-  return value as WalletId;
+/** Relay a client-signed transaction. The server validates + submits; it never signs. */
+export function submitSigned(token: string, walletId: string, signedXdr: string) {
+  return apiFetch<SubmitResult>(path`/v1/wallets/${walletId}/submit-signed`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ transaction_xdr: signedXdr }),
+  });
 }
 
-export interface SdkClientOptions {
-  baseUrl: string;
-  token: AuthToken;
+/** Email an OTP bound to this exact signed transaction, ahead of a withdrawal relay. */
+export function requestWithdrawOtp(token: string, walletId: string, signedXdr: string) {
+  return apiFetch<{ sent: boolean }>(path`/v1/wallets/${walletId}/withdraw/request-otp`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ transaction_xdr: signedXdr }),
+  });
 }
 
-// Encode a dynamic path segment so crafted values can't alter the request path.
-function encodeSegment(value: string): string {
-  return encodeURIComponent(value);
+/** Confirm the withdrawal OTP; only on success does the transaction actually relay to Horizon. */
+export function confirmWithdraw(
+  token: string,
+  walletId: string,
+  signedXdr: string,
+  code: string,
+) {
+  return apiFetch<SubmitResult>(path`/v1/wallets/${walletId}/withdraw/confirm`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ transaction_xdr: signedXdr, code }),
+  });
 }
 
-export class SdkClient {
-  private readonly baseUrl: string;
-  private readonly token: AuthToken;
-
-  constructor(options: SdkClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/$/, '');
-    this.token = options.token;
-  }
-
-  private headers(): Record<string, string> {
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.token}`,
-    };
-  }
-
-  async getWallet(token: AuthToken, walletId: WalletId): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/wallets/${encodeSegment(walletId)}`, {
-      method: 'GET',
-      headers: { ...this.headers(), Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`Failed to fetch wallet: ${res.status}`);
-    return res.json();
-  }
-
-  async getSponsorship(token: AuthToken, walletId: WalletId): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/wallets/${encodeSegment(walletId)}/sponsorship`, {
-      method: 'GET',
-      headers: { ...this.headers(), Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`Failed to fetch sponsorship: ${res.status}`);
-    return res.json();
-  }
-
-  async updateSponsorship(
-    token: AuthToken,
-    walletId: WalletId,
-    payload: Record<string, unknown>,
-  ): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/wallets/${encodeSegment(walletId)}/sponsorship`, {
-      method: 'PUT',
-      headers: { ...this.headers(), Authorization: `Bearer ${token}` },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(`Failed to update sponsorship: ${res.status}`);
-    return res.json();
-  }
+/** Fetch the opaque encrypted backup blob for new-device recovery (may be null). */
+export function getBackup(token: string, walletId: string) {
+  return apiFetch<{ wallet_id: string; encrypted_backup: string | null }>(
+    path`/v1/wallets/${walletId}/backup`,
+    { token },
+  );
 }
+
+/** Whether a Stellar account (G...) exists on-chain, looked up server-side via Horizon. */
+export function getAccountExists(token: string, walletId: string, account: string) {
+  return apiFetch<{ exists: boolean }>(
+    path`/v1/wallets/${walletId}/destinations/${account}`,
+    { token },
+  );
+}
+

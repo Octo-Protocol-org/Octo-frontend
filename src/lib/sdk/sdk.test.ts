@@ -1,8 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { fromMnemonic, generateWallet, keypairFromRawSeed } from "./keys";
 import { encryptSeed, decryptSeed, serializeBackup, parseBackup } from "./crypto";
-import { buildSignedPayment, buildSignedChangeTrust, type SigningInfo } from "./tx";
 import {
+  buildSignedPayment,
+  buildSignedChangeTrust,
+  buildSignedCreateAccount,
+  txExpiresAt,
+  TX_TIMEOUT_SECONDS,
+  type SigningInfo,
+} from "./tx";
+import {
+  Account,
+  MuxedAccount,
   Networks,
   TransactionBuilder,
   Keypair,
@@ -94,6 +103,51 @@ describe("transaction building + signing", () => {
     const tx = TransactionBuilder.fromXDR(xdr, Networks.TESTNET);
     expect(tx.source).toBe(VECTOR_ACCOUNT);
     expect(tx.signatures.length).toBe(1);
+  });
+
+  it("builds a signed create-account for an unfunded XLM destination", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    const destination = "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX";
+    const xdr = buildSignedCreateAccount(w.keypair, info, {
+      destination,
+      startingBalance: "2.5",
+    });
+    const tx = TransactionBuilder.fromXDR(xdr, Networks.TESTNET);
+    expect(tx.source).toBe(VECTOR_ACCOUNT);
+    expect(tx.signatures.length).toBe(1);
+    if (!("operations" in tx)) throw new Error("expected a plain transaction");
+    const op = tx.operations[0];
+    expect(op.type).toBe("createAccount");
+    if (op.type !== "createAccount") return;
+    expect(op.destination).toBe(destination);
+    expect(op.startingBalance).toBe("2.5000000");
+  });
+
+  it("rejects a muxed destination for create-account", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    expect(() =>
+      buildSignedCreateAccount(w.keypair, info, {
+        destination: new MuxedAccount(
+          new Account("GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "0"),
+          "42",
+        ).accountId(),
+        startingBalance: "2",
+      }),
+    ).toThrow();
+  });
+
+  it("txExpiresAt reads the envelope's own timebounds", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    const before = Date.now();
+    const xdr = buildSignedPayment(w.keypair, info, {
+      destination: "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX",
+      amount: "1",
+    });
+    const expires = txExpiresAt(xdr, Networks.TESTNET);
+    expect(expires).not.toBeNull();
+    // maxTime is whole seconds, so allow one second of truncation either side.
+    expect(expires!).toBeGreaterThanOrEqual(before + (TX_TIMEOUT_SECONDS - 1) * 1000);
+    expect(expires!).toBeLessThanOrEqual(Date.now() + TX_TIMEOUT_SECONDS * 1000 + 1000);
   });
 
   it("keypairFromRawSeed reproduces the same account", () => {

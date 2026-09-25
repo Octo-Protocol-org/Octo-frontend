@@ -1,4 +1,4 @@
-import { StrKey } from "@stellar/stellar-base";
+import { StrKey, MuxedAccount } from "@stellar/stellar-base";
 
 export type StellarAddressKind = "ed25519" | "med25519";
 
@@ -18,6 +18,14 @@ export function getStellarAddressKind(
   if (StrKey.isValidEd25519PublicKey(address)) return "ed25519";
   if (StrKey.isValidMed25519PublicKey(address)) return "med25519";
   return null;
+}
+
+// The underlying G... account of a valid address (muxed M... addresses share their base account).
+export function baseAccountOf(value: string): string {
+  const address = value.trim();
+  return StrKey.isValidMed25519PublicKey(address)
+    ? MuxedAccount.fromAddress(address, "0").baseAccount().accountId()
+    : address;
 }
 
 // Returns an inline error message, or null when the address is valid.

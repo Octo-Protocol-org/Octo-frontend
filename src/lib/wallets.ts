@@ -259,6 +259,82 @@ export const USDC_TESTNET = {
 } as const;
 
 // Withdrawals and trustlines are now built + signed CLIENT-SIDE via `@/lib/sdk` and relayed
-// through `submitSig
+// through `submitSigned` — the server holds no key to sign them. The old custodial
+// `withdraw()` / `addTrustline()` helpers were removed with the non-custodial cutover.
 
-/* … truncated 2324 chars — edit only what you need near the top … */
+export type ApiKeyInfo = {
+  wallet_id: string;
+  configured: boolean;
+  prefix: string | null;
+};
+
+export type GeneratedKey = {
+  wallet_id: string;
+  api_key: string;
+  prefix: string;
+};
+
+/** Metadata about the wallet's API key (prefix + whether configured) — never the secret. */
+export function getApiKey(token: string, id: string) {
+  return apiFetch<ApiKeyInfo>(path`/v1/wallets/${id}/api-key`, { token });
+}
+
+/** Generate (or regenerate) the wallet's API key. Returns the full key once. */
+export function generateApiKey(token: string, id: string) {
+  return apiFetch<GeneratedKey>(path`/v1/wallets/${id}/api-key`, {
+    method: "POST",
+    token,
+  });
+}
+
+// --- Withdrawal allowlist ("Whitelist") ------------------------------------
+//
+// An anti-fraud control: when enabled, submit-signed rejects payments to any destination not on
+// this list. Management requires the dashboard login JWT (not an API key) on the backend, which
+// `token` here always is.
+
+export type WhitelistConfig = { enabled: boolean };
+
+export type WhitelistedAddress = {
+  id: string;
+  address: string;
+  label: string | null;
+  created_at: string;
+};
+
+export function getWhitelistConfig(token: string, id: string) {
+  return apiFetch<WhitelistConfig>(path`/v1/wallets/${id}/whitelist/config`, { token });
+}
+
+export function setWhitelistEnabled(token: string, id: string, enabled: boolean) {
+  return apiFetch<WhitelistConfig>(path`/v1/wallets/${id}/whitelist/config`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function listWhitelistedAddresses(token: string, id: string) {
+  return apiFetch<WhitelistedAddress[]>(path`/v1/wallets/${id}/whitelist`, { token });
+}
+
+export function addWhitelistedAddress(
+  token: string,
+  id: string,
+  address: string,
+  label?: string,
+) {
+  return apiFetch<WhitelistedAddress>(path`/v1/wallets/${id}/whitelist`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ address, label: label || null }),
+  });
+}
+
+export function removeWhitelistedAddress(token: string, id: string, entryId: string) {
+  return apiFetch<{ removed: boolean }>(path`/v1/wallets/${id}/whitelist/${entryId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
