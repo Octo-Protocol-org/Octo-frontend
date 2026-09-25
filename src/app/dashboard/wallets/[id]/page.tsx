@@ -551,6 +551,9 @@ function DepositModal({
   );
 }
 
+/** Matches the signup OTP cooldown in AuthForm. */
+const RESEND_COOLDOWN_SECS = 30;
+
 /** A withdrawable asset derived from the wallet's balances. */
 type WithdrawAsset = {
   code: string; // display code, e.g. "XLM" or "USDC"
@@ -617,6 +620,10 @@ function WithdrawModal({
   const [now, setNow] = useState(0);
   const [networkExpired, setNetworkExpired] = useState(false);
   const [resigning, setResigning] = useState(false);
+  // OTP resend cooldown for the already-signed tx.
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [resending, setResending] = useState(false);
+  const resendCooldown = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
 
   const selected =
     assets.find((a) => a.code === selectedCode) ?? assets[0];
@@ -627,10 +634,10 @@ function WithdrawModal({
 
   // Tick once a second while a signed transaction is waiting for its code.
   useEffect(() => {
-    if (expiresAt === null) return;
+    if (expiresAt === null && !pendingXdr) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [expiresAt]);
+  }, [expiresAt, pendingXdr]);
 
   const secondsLeft =
     expiresAt === null
@@ -725,6 +732,7 @@ function WithdrawModal({
       setExpiresAt(txExpiresAt(signedXdr, info.network_passphrase));
       setNetworkExpired(false);
       setResigning(false);
+      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECS * 1000);
       setPendingXdr(signedXdr);
     } catch (err) {
       const message = friendlyResultMessage(
@@ -737,6 +745,25 @@ function WithdrawModal({
       // The password is only needed for the instant of signing; never keep it around.
       setPassword("");
       setSubmitting(false);
+    }
+  }
+
+  // Re-sends the OTP for the already-signed tx, so the user doesn't have to unlock and sign again.
+  async function resendOtp() {
+    if (!pendingXdr || resending || resendCooldown > 0 || expired) return;
+    setError(null);
+    setResending(true);
+    try {
+      await requestWithdrawOtp(token, walletId, pendingXdr);
+      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECS * 1000);
+      setNow(Date.now());
+      toast.success("A new code is on its way.");
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Could not resend the code.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setResending(false);
     }
   }
 
@@ -874,6 +901,12 @@ function WithdrawModal({
           <OtpInput value={code} onChange={setCode} disabled={submitting} />
         </div>
 
+        {expired && (
+          <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+            This signed withdrawal has expired. Go back and sign it again to get a new code.
+          </p>
+        )}
+
         {error && (
           <p className="mt-4 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
             {error}
@@ -882,11 +915,28 @@ function WithdrawModal({
 
         <button
           onClick={confirm}
-          disabled={submitting}
+          disabled={submitting || expired}
           className="mt-5 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
         >
           {submitting ? "Confirming…" : "Verify & withdraw"}
         </button>
+        {!expired && (
+          <p className="mt-4 text-center text-xs text-muted">
+            Didn&apos;t get a code?{" "}
+            <button
+              type="button"
+              onClick={resendOtp}
+              disabled={resending || resendCooldown > 0}
+              className="font-semibold text-foreground hover:text-burgundy-bright disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resending
+                ? "Sending…"
+                : resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend code"}
+            </button>
+          </p>
+        )}
         <button
           onClick={() => discardSigned(false)}
           className="mt-3 w-full text-center text-xs text-muted hover:text-foreground"
