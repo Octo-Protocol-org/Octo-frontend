@@ -9,6 +9,7 @@ import {
   updateSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
+import { asAuthToken, asWalletId } from "@/lib/sdk/client";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
@@ -38,7 +39,7 @@ export default function SponsorshipSettingsPage({
   useEffect(() => {
     if (!token) return;
     getWallet(token, id).then(setWallet).catch(() => {});
-    getSponsorshipConfig(id, token)
+    getSponsorshipConfig(asAuthToken(token), asWalletId(id))
       .then((c) => {
         setConfig(c);
         setEnabled(c.enabled);
@@ -74,7 +75,7 @@ export default function SponsorshipSettingsPage({
 
     setSaving(true);
     try {
-      const updated = await updateSponsorshipConfig(id, token, {
+      const updated = await updateSponsorshipConfig(asAuthToken(token), asWalletId(id), {
         enabled,
         per_tx_fee_cap_stroops: feeStroops,
         daily_budget_stroops: budgetStroops,
@@ -208,6 +209,61 @@ export default function SponsorshipSettingsPage({
                     className="mt-1.5 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
                   />
                   <p className="mt-1 text-xs text-muted">
-                    Maxi
+                    Maximum fee the master wallet will pay per sponsored
+                    transaction.
+                  </p>
+                </div>
 
-/* … truncated 2106 chars — edit only what you need near the top … */
+                {/* daily budget */}
+                <div>
+                  <label
+                    htmlFor="daily-budget"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Daily budget (XLM)
+                  </label>
+                  <input
+                    id="daily-budget"
+                    value={dailyBudget}
+                    onChange={(e) => setDailyBudget(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.0000000"
+                    className="mt-1.5 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
+                  />
+                  <p className="mt-1 text-xs text-muted">
+                    {stroopsToAmount(remaining)} XLM remaining of today&apos;s
+                    budget.
+                  </p>
+                </div>
+
+                {error && (
+                  <p className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  onClick={onSave}
+                  disabled={saving}
+                  className="w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Save settings"}
+                </button>
+              </section>
+
+              {token && (
+                <SponsoredTransactionsTable walletId={id} token={token} />
+              )}
+            </div>
+          </main>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 rounded-xl border border-burgundy/40 bg-burgundy/20 px-4 py-3 text-sm text-burgundy-bright shadow-lg">
+          ✓ {toast}
+        </div>
+      )}
+    </div>
+  );
+}

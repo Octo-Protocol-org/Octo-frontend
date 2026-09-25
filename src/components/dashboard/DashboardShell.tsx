@@ -10,11 +10,13 @@ export function DashboardShell({
   user,
   title,
   onLogout,
+  blockNavigation,
   children,
 }: {
   user?: User | null;
   title: string;
   onLogout: () => void;
+  blockNavigation?: (href: string) => boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -28,7 +30,7 @@ export function DashboardShell({
       </div>
 
       <div className="relative z-10 flex flex-1">
-        <Sidebar user={user} />
+        <Sidebar user={user} blockNavigation={blockNavigation} />
 
         <div className="flex flex-1 flex-col">
           {/* topbar */}

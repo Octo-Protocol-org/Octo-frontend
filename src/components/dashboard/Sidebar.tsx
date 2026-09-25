@@ -25,7 +25,14 @@ const NAV: {
   { label: "Settings", href: "/dashboard/settings", icon: "⚙" },
 ];
 
-export function Sidebar({ user }: { user?: User | null }) {
+export function Sidebar({
+  user,
+  blockNavigation,
+}: {
+  user?: User | null;
+  /** Returns true to cancel a nav click (e.g. while unsaved one-time secrets are shown). */
+  blockNavigation?: (href: string) => boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -71,6 +78,9 @@ export function Sidebar({ user }: { user?: User | null }) {
             <Link
               key={item.label}
               href={item.href}
+              onNavigate={(e) => {
+                if (blockNavigation?.(item.href)) e.preventDefault();
+              }}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                 active
                   ? "bg-burgundy/25 text-foreground"

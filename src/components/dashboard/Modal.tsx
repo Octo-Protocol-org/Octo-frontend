@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/components/CopyButton";
 
@@ -13,15 +13,33 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const titleId = useId();
+
+  // Escape closes, matching native dialog behaviour for keyboard users.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       <div
         className="absolute inset-0 bg-scrim backdrop-blur-sm"
         onClick={onClose}
       />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-burgundy-soft/40 p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-foreground">
+            {title}
+          </h3>
           <button
             onClick={onClose}
             className="text-muted hover:text-foreground"

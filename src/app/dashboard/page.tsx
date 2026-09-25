@@ -9,6 +9,7 @@ import {
   getSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
+import { asAuthToken, asWalletId } from "@/lib/sdk/client";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
@@ -31,7 +32,7 @@ export default function DashboardHome() {
         // Fetch sponsorship configs in parallel so the wallet list never has to wait on them.
         // A single failed sponsorship fetch must not blank out the whole row.
         const results = await Promise.allSettled(
-          ws.map((w) => getSponsorshipConfig(w.id, token)),
+          ws.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
         );
         if (aborted) return;
         const map = new Map<string, SponsorshipConfig | null>();
@@ -244,6 +245,27 @@ function ManageMenu({ walletId }: { walletId: string }) {
 
       {open && (
         <>
-        
-
-/* … truncated 802 chars — edit only what you need near the top … */
+          {/* click-away */}
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-popover backdrop-blur-md">
+            <Link
+              href={`/dashboard/wallets/${walletId}`}
+              className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
+            >
+              ▦ Go to dashboard
+            </Link>
+            <Link
+              href={`/dashboard/wallets/${walletId}/api`}
+              className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
+            >
+              ↗ API settings
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
