@@ -14,7 +14,12 @@ export type { WalletKeys } from "./keys";
 export { encryptSeed, decryptSeed, serializeBackup, parseBackup } from "./crypto";
 export type { EncryptedBackup } from "./crypto";
 
-export { buildSignedPayment, buildSignedChangeTrust, buildUnsignedPayment } from "./tx";
+export {
+  buildSignedPayment,
+  buildSignedChangeTrust,
+  buildUnsignedPayment,
+  txExpiresAtMs,
+} from "./tx";
 export type { SigningInfo } from "./tx";
 
 export {

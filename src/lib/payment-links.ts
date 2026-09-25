@@ -152,6 +152,8 @@ export type PaymentIntent = {
   payment_id: string;
   deposit_address: string;
   amount_usdc_stroops: number;
+  /** ISO timestamp after which the intent can no longer be paid, when the API provides it. */
+  expires_at?: string | null;
 };
 
 export function createPaymentIntent(

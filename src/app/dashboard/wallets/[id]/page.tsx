@@ -25,6 +25,7 @@ import {
   confirmWithdraw,
   buildSignedPayment,
   buildSignedChangeTrust,
+  txExpiresAtMs,
   type SubmitResult,
 } from "@/lib/sdk";
 import { OtpInput } from "@/components/auth/OtpInput";
@@ -530,6 +531,9 @@ function DepositModal({
   );
 }
 
+/** Matches the signup OTP cooldown in AuthForm. */
+const RESEND_COOLDOWN_SECS = 30;
+
 /** A withdrawable asset derived from the wallet's balances. */
 type WithdrawAsset = {
   code: string; // display code, e.g. "XLM" or "USDC"
@@ -577,6 +581,21 @@ function WithdrawModal({
   // Once the transaction is signed, it's held here awaiting OTP confirmation before it ever relays.
   const [pendingXdr, setPendingXdr] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // Signed tx's on-chain expiry; the OTP is useless past this, so resend/verify stop too.
+  const [pendingExpiresAt, setPendingExpiresAt] = useState<number | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  // One-second clock while awaiting the OTP, driving the resend cooldown and expiry.
+  useEffect(() => {
+    if (!pendingXdr) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [pendingXdr]);
+
+  const resendCooldown = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
+  const pendingExpired = pendingExpiresAt !== null && now >= pendingExpiresAt;
 
   const selected =
     assets.find((a) => a.code === selectedCode) ?? assets[0];
@@ -607,6 +626,9 @@ function WithdrawModal({
         asset: selected.asset, // undefined => XLM
       });
       await requestWithdrawOtp(token, walletId, signedXdr);
+      setPendingExpiresAt(txExpiresAtMs(signedXdr, info.network_passphrase));
+      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECS * 1000);
+      setNow(Date.now());
       setPendingXdr(signedXdr);
     } catch (err) {
       const message =
@@ -618,13 +640,38 @@ function WithdrawModal({
       setError(message);
       toast.error(message);
     } finally {
+      // The password is only needed for the instant of signing; never keep it around.
+      setPassword("");
       setSubmitting(false);
+    }
+  }
+
+  // Re-sends the OTP for the already-signed tx, so the user doesn't have to unlock and sign again.
+  async function resendOtp() {
+    if (!pendingXdr || resending || resendCooldown > 0 || pendingExpired) return;
+    setError(null);
+    setResending(true);
+    try {
+      await requestWithdrawOtp(token, walletId, pendingXdr);
+      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECS * 1000);
+      setNow(Date.now());
+      toast.success("A new code is on its way.");
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Could not resend the code.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setResending(false);
     }
   }
 
   async function confirm() {
     if (!pendingXdr) return;
     setError(null);
+    if (pendingExpired) {
+      setError("This withdrawal expired before it was confirmed. Go back and sign it again.");
+      return;
+    }
     if (code.length !== 6) {
       setError("Enter the 6-digit code from your email.");
       return;
@@ -697,6 +744,12 @@ function WithdrawModal({
           <OtpInput value={code} onChange={setCode} disabled={submitting} />
         </div>
 
+        {pendingExpired && (
+          <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+            This signed withdrawal has expired. Go back and sign it again to get a new code.
+          </p>
+        )}
+
         {error && (
           <p className="mt-4 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
             {error}
@@ -705,14 +758,32 @@ function WithdrawModal({
 
         <button
           onClick={confirm}
-          disabled={submitting}
+          disabled={submitting || pendingExpired}
           className="mt-5 w-full rounded-lg glass-btn-primary py-2.5 text-sm font-semibold disabled:opacity-60"
         >
           {submitting ? "Confirming…" : "Verify & withdraw"}
         </button>
+        {!pendingExpired && (
+          <p className="mt-4 text-center text-xs text-muted">
+            Didn&apos;t get a code?{" "}
+            <button
+              type="button"
+              onClick={resendOtp}
+              disabled={resending || resendCooldown > 0}
+              className="font-semibold text-foreground hover:text-burgundy-bright disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resending
+                ? "Sending…"
+                : resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend code"}
+            </button>
+          </p>
+        )}
         <button
           onClick={() => {
             setPendingXdr(null);
+            setPendingExpiresAt(null);
             setCode("");
             setError(null);
           }}

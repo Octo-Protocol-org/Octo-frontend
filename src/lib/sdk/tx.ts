@@ -116,3 +116,10 @@ export function buildSignedChangeTrust(
   tx.sign(keypair);
   return tx.toXDR();
 }
+
+/** Epoch ms after which the network rejects this signed tx (its timebounds maxTime), or null if unbounded. */
+export function txExpiresAtMs(xdr: string, networkPassphrase: string): number | null {
+  const tx = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  const maxTime = "timeBounds" in tx ? Number(tx.timeBounds?.maxTime ?? 0) : 0;
+  return maxTime > 0 ? maxTime * 1000 : null;
+}
