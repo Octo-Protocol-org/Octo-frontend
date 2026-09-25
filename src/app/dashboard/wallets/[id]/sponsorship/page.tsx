@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
-import { getWallet, stroopsToAmount, amountToStroops, type WalletView } from "@/lib/wallets";
+import { getWallet, amountToStroops, type WalletView } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
   updateSponsorshipConfig,
@@ -14,6 +14,7 @@ import { DashboardBackground } from "@/components/dashboard/DashboardBackground"
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
 import { ApiError } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops } from "@/lib/amount";
 
 export default function SponsorshipSettingsPage({
   params,
@@ -44,12 +45,12 @@ export default function SponsorshipSettingsPage({
         setEnabled(c.enabled);
         setMaxFee(
           c.per_tx_fee_cap_stroops != null
-            ? stroopsToAmount(c.per_tx_fee_cap_stroops)
+            ? formatStroops(c.per_tx_fee_cap_stroops)
             : "",
         );
         setDailyBudget(
           c.daily_budget_stroops != null
-            ? stroopsToAmount(c.daily_budget_stroops)
+            ? formatStroops(c.daily_budget_stroops)
             : "",
         );
       })
@@ -146,8 +147,8 @@ export default function SponsorshipSettingsPage({
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted">Today&apos;s spend</span>
                   <span className="text-foreground">
-                    {stroopsToAmount(spentToday)} XLM spent of{" "}
-                    {stroopsToAmount(budgetStroops)} XLM daily budget
+                    {formatStroops(spentToday)} XLM spent of{" "}
+                    {formatStroops(budgetStroops)} XLM daily budget
                   </span>
                 </div>
                 <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-hover">
@@ -157,7 +158,7 @@ export default function SponsorshipSettingsPage({
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted">
-                  {stroopsToAmount(remaining)} XLM remaining today
+                  {formatStroops(remaining)} XLM remaining today
                 </p>
               </section>
 

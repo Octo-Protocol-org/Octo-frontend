@@ -3,6 +3,7 @@
 "use client";
 
 import { apiFetch, path } from "./api";
+import { parseAmount, toApiStroops } from "./amount";
 
 export type CreateWalletResponse = {
   id: string;
@@ -225,11 +226,6 @@ export function listAddressesPage(
   );
 }
 
-/** Format integer stroops as a decimal XLM-style string (7 dp). */
-export function stroopsToAmount(stroops: number): string {
-  return (stroops / 10_000_000).toFixed(7);
-}
-
 /**
  * The transactions table stores the literal string "native" as `asset_code` for XLM (mirroring
  * Horizon's own `asset_type` convention) — display it as "XLM" everywhere a user sees it.
@@ -240,9 +236,7 @@ export function displayAssetCode(assetCode: string): string {
 
 /** Parse a decimal XLM amount string into integer stroops, or null if invalid. */
 export function amountToStroops(xlm: string): number | null {
-  const n = Number(xlm);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 10_000_000);
+  return toApiStroops(parseAmount(xlm));
 }
 
 /**

@@ -9,7 +9,6 @@ import {
   listPaymentLinkPayments,
   createPaymentLink,
   setPaymentLinkActive,
-  usdcStroopsToAmount,
   usdAmountToStroops,
   type PaymentLink,
   type PaymentLinkPayment,
@@ -21,6 +20,7 @@ import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops, sumStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -121,10 +121,10 @@ export default function PaymentLinksPage({
     }
   }
 
-  const totalCollected = links.reduce((sum, l) => sum + l.collected_usdc_stroops, 0);
+  const totalCollected = sumStroops(links.map((l) => l.collected_usdc_stroops));
   const activeCount = links.filter((l) => l.active).length;
   const paidLinks = links.filter((l) => l.collected_usdc_stroops > 0);
-  const avgPayment = paidLinks.length > 0 ? totalCollected / paidLinks.length : 0;
+  const avgPayment = paidLinks.length > 0 ? totalCollected / BigInt(paidLinks.length) : BigInt(0);
 
   if (loading || !user) {
     return (
@@ -178,11 +178,11 @@ export default function PaymentLinksPage({
                 <Stat label="Active links" value={String(activeCount)} />
                 <Stat
                   label="Total collected"
-                  value={`$${usdcStroopsToAmount(totalCollected)}`}
+                  value={`$${formatStroops(totalCollected)}`}
                 />
                 <Stat
                   label="Avg. payment"
-                  value={`$${usdcStroopsToAmount(Math.round(avgPayment))}`}
+                  value={`$${formatStroops(avgPayment)}`}
                 />
               </div>
 
@@ -236,7 +236,7 @@ export default function PaymentLinksPage({
                               )}
                             </td>
                             <td className="py-3 pr-4 text-foreground">
-                              ${usdcStroopsToAmount(link.amount_usdc_stroops)}
+                              ${formatStroops(link.amount_usdc_stroops)}
                             </td>
                             <td className="py-3 pr-4">
                               <span
@@ -250,7 +250,7 @@ export default function PaymentLinksPage({
                               </span>
                             </td>
                             <td className="py-3 pr-4 text-foreground">
-                              ${usdcStroopsToAmount(link.collected_usdc_stroops)}
+                              ${formatStroops(link.collected_usdc_stroops)}
                             </td>
                             <td className="py-3 pr-4">
                               <div className="flex gap-2">
@@ -364,14 +364,20 @@ function CreateLinkModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    // Reject rather than fall through to an open-amount link when the input doesn't parse exactly.
+    const amountUsdcStroops = usdAmountToStroops(amount);
+    if (amountUsdcStroops === null) {
+      setError("Enter an amount greater than 0 with at most 7 decimal places.");
+      return;
+    }
+    setSubmitting(true);
     try {
       const link = await createPaymentLink(token, walletId, {
         name,
-        amount_usdc_stroops: usdAmountToStroops(amount),
+        amountUsdcStroops,
         description: description || undefined,
-        image_url: imageUrl || undefined,
+        imageUrl: imageUrl || undefined,
       });
       onCreated(link);
     } catch (err) {
@@ -490,7 +496,7 @@ function LinkDetailModal({
                   className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
                 >
                   <span className="text-foreground">
-                    ${usdcStroopsToAmount(p.amount_usdc_stroops)}
+                    ${formatStroops(p.amount_usdc_stroops)}
                   </span>
                   <span className="text-xs text-muted">
                     {new Date(p.created_at).toLocaleString()}

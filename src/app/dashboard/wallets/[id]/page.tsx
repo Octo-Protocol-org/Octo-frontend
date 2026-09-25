@@ -11,7 +11,6 @@ import {
   listTransactions,
   createAddress,
   USDC_TESTNET,
-  stroopsToAmount,
   type WalletView,
   type Balance,
   type Address,
@@ -35,6 +34,7 @@ import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { ApiError } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops, parseAmount } from "@/lib/amount";
 
 export default function WalletOverview({
   params,
@@ -263,7 +263,7 @@ export default function WalletOverview({
                           {t.id.slice(0, 8)}…
                         </td>
                         <td className="py-3">
-                          {stroopsToAmount(t.amount_stroops)}{" "}
+                          {formatStroops(t.amount_stroops)}{" "}
                           {t.asset_code === "native" ? "XLM" : t.asset_code}
                         </td>
                         <td className="py-3 font-mono text-xs">
@@ -587,8 +587,9 @@ function WithdrawModal({
       setError("Destination must be a Stellar address (G… or M…).");
       return;
     }
-    if (!(Number(amount) > 0)) {
-      setError("Enter a valid amount greater than 0.");
+    const parsed = parseAmount(amount);
+    if (parsed === null || parsed <= BigInt(0)) {
+      setError("Enter an amount greater than 0 with at most 7 decimal places.");
       return;
     }
     if (!password) {
@@ -603,7 +604,7 @@ function WithdrawModal({
       const info = await getSigningInfo(token, walletId);
       const signedXdr = buildSignedPayment(keypair, info, {
         destination,
-        amount, // decimal string, e.g. "1.5"
+        amount: formatStroops(parsed), // canonical 7-dp string of exactly what was validated
         asset: selected.asset, // undefined => XLM
       });
       await requestWithdrawOtp(token, walletId, signedXdr);

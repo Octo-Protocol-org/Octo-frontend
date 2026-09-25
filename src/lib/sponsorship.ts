@@ -77,11 +77,3 @@ export function listSponsoredTransactions(
     { token },
   );
 }
-
-/**
- * Format integer stroops as a human-readable XLM string (2 dp).
- * Raw stroop values are for the API only — never expose them to end users.
- */
-export function stroopsToXlm(stroops: number): string {
-  return `${(stroops / 10_000_000).toFixed(2)} XLM`;
-}

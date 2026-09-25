@@ -12,6 +12,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * We use a per-request nonce with `strict-dynamic` (the Next.js-recommended strict approach).
  * Production needs no `'unsafe-eval'`/`'wasm-unsafe-eval'` because our crypto stack
  * (@noble, @scure, @stellar/stellar-base) is pure JS and uses WebCrypto — no WASM, no eval.
+ *
+ * COOP `same-origin` severs `window.opener` links to cross-origin windows (tab-nabbing, XS-Leaks
+ * via window references). Freighter is unaffected: it talks to the page through its extension
+ * content script via postMessage and opens its own extension popup, not a cross-origin
+ * `window.open`. CORP `same-origin` stops other sites embedding our responses (Spectre-style
+ * leaks); it only governs responses we serve, so uploads to and images from Cloudinary still work.
  */
 function apiOrigin(): string {
   // The browser talks to the Octo API (which in turn reaches Horizon server-side), so only the
@@ -129,6 +135,8 @@ export function proxy(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
   response.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",

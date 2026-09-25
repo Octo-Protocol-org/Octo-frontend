@@ -7,7 +7,6 @@ import {
   getWallet,
   listAddresses,
   createAddress,
-  stroopsToAmount,
   type WalletView,
   type Address,
 } from "@/lib/wallets";
@@ -16,6 +15,7 @@ import { DashboardBackground } from "@/components/dashboard/DashboardBackground"
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops, sumStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -78,7 +78,7 @@ export default function AddressesPage({
     }
   }
 
-  const totalReceived = addresses.reduce((sum, a) => sum + a.received_stroops, 0);
+  const totalReceived = sumStroops(addresses.map((a) => a.received_stroops));
 
   if (loading || !user) {
     return (
@@ -133,7 +133,7 @@ export default function AddressesPage({
               <Stat label="Total addresses" value={String(addresses.length)} />
               <Stat
                 label="Total received"
-                value={`${stroopsToAmount(totalReceived)} XLM`}
+                value={`${formatStroops(totalReceived)} XLM`}
                 sub="Across all addresses"
               />
               <Stat
@@ -229,7 +229,7 @@ function AddressRow({
       <td className="py-3 pr-4 font-mono text-muted">{address.memo_id}</td>
       <td className="py-3 font-medium text-foreground">
         {address.received_stroops > 0
-          ? `${stroopsToAmount(address.received_stroops)} XLM`
+          ? `${formatStroops(address.received_stroops)} XLM`
           : "$0"}
       </td>
     </tr>
@@ -249,7 +249,7 @@ function AddressDetail({
         <div className="rounded-lg bg-surface-sunken p-3 text-center">
           <p className="text-xs text-muted">Total received</p>
           <p className="mt-1 text-xl font-semibold text-foreground">
-            {stroopsToAmount(address.received_stroops)} XLM
+            {formatStroops(address.received_stroops)} XLM
           </p>
         </div>
 

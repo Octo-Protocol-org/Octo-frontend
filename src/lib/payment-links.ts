@@ -3,6 +3,7 @@
 "use client";
 
 import { apiFetch } from "./api";
+import { parseAmount, toApiStroops } from "./amount";
 import type { AuthToken, WalletId } from "./brands";
 
 export type PaymentLink = {
@@ -222,16 +223,9 @@ export function submitPublicPayment(
   });
 }
 
-/** Format integer USDC stroops (7 dp) as a decimal string. */
-export function usdcStroopsToAmount(stroops: number): string {
-  return (stroops / 10_000_000).toFixed(7);
-}
-
 /** Parse a decimal USD amount string into integer USDC stroops, or null if invalid. */
 export function usdAmountToStroops(usd: string): number | null {
-  const n = Number(usd);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 10_000_000);
+  return toApiStroops(parseAmount(usd));
 }
 
 /** Basic shape check (not full RFC 5322) — enough to catch typos before submitting. */
