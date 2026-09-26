@@ -17,6 +17,7 @@ import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletU
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { formatStroops } from "@/lib/amount";
+import { usePolling } from "@/lib/usePolling";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -83,11 +84,14 @@ export default function TransactionsPage({
   // Silently re-fetch in the background so a deposit (e.g. from a payment link) shows up without
   // needing a manual refresh. Only page 1 auto-refreshes — re-fetching a deeper page would fight
   // the user as rows shift underneath them.
-  useEffect(() => {
-    if (!token || pageIndex !== 0) return;
-    const interval = setInterval(() => load(null, { silent: true }), 5000);
-    return () => clearInterval(interval);
-  }, [token, pageIndex, load]);
+  const pollFn = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!token || pageIndex !== 0) return;
+      await load(null, { silent: true });
+    },
+    [token, pageIndex, load],
+  );
+  usePolling(pollFn, 5000);
 
   function goNext() {
     if (!nextCursor) return;

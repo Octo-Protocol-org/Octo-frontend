@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
@@ -44,6 +44,7 @@ import {
   reserveIsExact,
 } from "@/lib/stellar/reserve";
 import { friendlyResultMessage, isExpiredResult } from "@/lib/stellar/resultCodes";
+import { usePolling } from "@/lib/usePolling";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
@@ -63,6 +64,8 @@ export default function WalletOverview({
 
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [balances, setBalances] = useState<Balance[]>([]);
+  // True until the first successful balances + addresses fetch completes.
+  const [statsLoading, setStatsLoading] = useState(true);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [creating, setCreating] = useState(false);
@@ -81,21 +84,26 @@ export default function WalletOverview({
   useEffect(() => {
     if (!token) return;
     getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    getBalances(token, id).then(setBalances).catch(() => setBalances([]));
-    listAddresses(token, id).then(setAddresses).catch(() => setAddresses([]));
-    listTransactions(token, id).then(setTxns).catch(() => setTxns([]));
+    Promise.all([
+      getBalances(token, id).then(setBalances).catch(() => setBalances([])),
+      listAddresses(token, id).then(setAddresses).catch(() => setAddresses([])),
+      listTransactions(token, id).then(setTxns).catch(() => setTxns([])),
+    ]).finally(() => setStatsLoading(false));
   }, [token, id]);
 
   // Silently re-fetch balances + recent transactions in the background so a new deposit shows up
   // without a manual refresh — no loading indicator here, that's only for explicit refresh actions.
-  useEffect(() => {
-    if (!token) return;
-    const interval = setInterval(() => {
-      getBalances(token, id).then(setBalances).catch(() => {});
-      listTransactions(token, id).then(setTxns).catch(() => {});
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [token, id]);
+  const pollFn = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!token) return;
+      await Promise.all([
+        getBalances(token, id).then(setBalances).catch(() => {}),
+        listTransactions(token, id).then(setTxns).catch(() => {}),
+      ]);
+    },
+    [token, id],
+  );
+  usePolling(pollFn, 5000);
 
   async function onNewAddress() {
     if (!token) return;
@@ -116,9 +124,18 @@ export default function WalletOverview({
 
   const xlm = balances.find((b) => b.asset_type === "native");
   const xlmAmount = xlm ? xlm.balance : "0";
-  const hasUsdc = balances.some(
+  const usdcBalance = balances.find(
     (b) => b.asset_code === USDC_TESTNET.code && b.asset_issuer === USDC_TESTNET.issuer,
   );
+  const hasUsdc = usdcBalance !== undefined;
+  // Spendable XLM is derived client-side; show "—" until balances load to avoid fake zeros.
+  const spendableDisplay = statsLoading
+    ? "—"
+    : `${formatStroops(spendableNativeStroops(
+        (() => { const p = parseAmount(xlmAmount); return p.ok ? p.stroops : BigInt(0); })(),
+        null,
+        balances.filter((b) => b.asset_type !== "native").length,
+      ))} XLM`;
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
@@ -178,10 +195,23 @@ export default function WalletOverview({
 
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Stat label="Total Balance" value={`${xlmAmount} XLM`} />
-              <Stat label="Current Balance" value={`${xlmAmount} XLM`} />
-              <Stat label="Unswept Balance" value="0 XLM" sub="No sweep needed (muxed)" />
-              <Stat label="No. of Assets" value={String(balances.length || 1)} />
+              <Stat
+                label="XLM Balance"
+                value={statsLoading ? "—" : `${xlmAmount} XLM`}
+              />
+              <Stat
+                label="USDC Balance"
+                value={statsLoading ? "—" : usdcBalance ? `${usdcBalance.balance} USDC` : "No trustline"}
+              />
+              <Stat
+                label="Spendable XLM"
+                value={spendableDisplay}
+                sub="After Stellar minimum reserve"
+              />
+              <Stat
+                label="Generated Addresses"
+                value={statsLoading ? "—" : String(addresses.length)}
+              />
             </div>
 
             {/* action row */}
