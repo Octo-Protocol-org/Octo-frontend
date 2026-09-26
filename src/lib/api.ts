@@ -61,6 +61,14 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
+    // On 401 for authenticated requests, broadcast a session-expired event so useAuth can
+    // redirect once regardless of how many concurrent requests are in-flight.
+    if (res.status === 401 && token) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("session-expired"));
+      }
+    }
+
     // The backend's 500 message is a generic "internal server error" with no actionable detail —
     // swap in something a user can actually act on rather than surfacing that verbatim.
     const message =

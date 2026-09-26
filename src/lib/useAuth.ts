@@ -1,24 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getToken, clearToken, me, type User } from "./auth";
-import { clearLocalBackups } from "./sdk";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { getToken, signOut, me, type User } from "./auth";
 
 /** The page loading spinner shows for at least this long, even if auth resolves faster —
  * otherwise on a fast connection it flashes for a frame and the animation never registers. */
 const MIN_LOADING_MS = 700;
 
-/** Guard a page: ensures a valid token, returns the user (or null while loading). */
+/**
+ * Guard a page: ensures a valid token, returns the user (or null while loading).
+ *
+ * Handles three sign-out triggers in one place:
+ *  1. Explicit logout() call (e.g. sidebar button).
+ *  2. 401 from any apiFetch → "session-expired" CustomEvent.
+ *  3. Another tab removing octo_token → storage event.
+ */
 export function useAuth() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Prevent multiple concurrent redirects racing each other.
+  const signingOut = useRef(false);
+
+  /** Redirect to /login?next=<current path> and wipe local state. */
+  function doSignOut(reason?: "expired") {
+    if (signingOut.current) return;
+    signingOut.current = true;
+    signOut();
+    setUser(null);
+    setToken(null);
+    // Encode the current path so the user lands back here after re-login.
+    const next = encodeURIComponent(pathname ?? "/dashboard");
+    const query = reason === "expired" ? `?next=${next}&reason=expired` : `?next=${next}`;
+    router.replace(`/login${query}`);
+  }
 
   useEffect(() => {
-    // Timed from when the request actually starts, not from first render — reading the clock
-    // during render is impure and re-evaluates on every re-render.
     const startedAt = Date.now();
     const t = getToken();
     if (!t) {
@@ -31,8 +51,8 @@ export function useAuth() {
         setToken(t);
       })
       .catch(() => {
-        clearToken();
-        router.replace("/login");
+        // me() failed — could be a 401 (expired) or network error. Either way, sign out fully.
+        doSignOut("expired");
       })
       .finally(() => {
         const elapsed = Date.now() - startedAt;
@@ -43,13 +63,34 @@ export function useAuth() {
           setLoading(false);
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  useEffect(() => {
+    // Handle 401 from any apiFetch anywhere on the page — apiFetch dispatches this event.
+    function onSessionExpired() {
+      doSignOut("expired");
+    }
+
+    // Sign out when another tab removes the token from storage.
+    function onStorage(e: StorageEvent) {
+      if (e.key === "octo_token" && e.newValue === null) {
+        doSignOut();
+      }
+    }
+
+    window.addEventListener("session-expired", onSessionExpired);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("session-expired", onSessionExpired);
+      window.removeEventListener("storage", onStorage);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  /** Explicit logout (e.g. sidebar button). */
   function logout() {
-    clearToken();
-    // Remove the locally-cached encrypted key backups; a new login re-fetches from the server.
-    clearLocalBackups();
-    router.replace("/login");
+    doSignOut();
   }
 
   return { user, token, loading, logout };

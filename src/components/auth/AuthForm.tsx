@@ -12,7 +12,17 @@ type Step = "credentials" | "verify";
 
 const RESEND_COOLDOWN_SECS = 30;
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({
+  mode,
+  next,
+  reason,
+}: {
+  mode: Mode;
+  /** Same-origin path to redirect to after successful login. Already validated server-side. */
+  next?: string;
+  /** "expired" shows a banner explaining why the user was redirected. */
+  reason?: string;
+}) {
   const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +38,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
     saveToken(token);
     // Hard navigation so the dashboard mounts fresh with the token already in
     // localStorage (avoids a client-router race that can bounce back to /login).
-    window.location.assign("/dashboard");
+    // Redirect to the page the user was on before session expiry, or the dashboard.
+    window.location.assign(next ?? "/dashboard");
   }
 
   function startCooldown() {
@@ -162,6 +173,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </p>
 
       <div className="my-7 h-px bg-border" />
+
+      {reason === "expired" && (
+        <p className="mb-5 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+          Your session expired. Please sign in again to continue.
+        </p>
+      )}
 
       <form onSubmit={onSubmit} className="space-y-5">
         <div>
