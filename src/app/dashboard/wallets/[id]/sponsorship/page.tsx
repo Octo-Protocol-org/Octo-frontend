@@ -62,17 +62,27 @@ export default function SponsorshipSettingsPage({
     if (!token) return;
     setError(null);
 
-    const feeStroops = amountToStroops(maxFee);
-    const budgetStroops = amountToStroops(dailyBudget);
+    // Only enforce cap values when enabling — disabling with empty fields must be allowed.
+    if (enabled) {
+      const feeStroops = amountToStroops(maxFee);
+      const budgetStroops = amountToStroops(dailyBudget);
+      if (feeStroops === null || budgetStroops === null) {
+        setError("Enter a max fee and daily budget greater than 0 XLM.");
+        return;
+      }
+      if (feeStroops > budgetStroops) {
+        setError("Max fee per transaction cannot exceed the daily budget.");
+        return;
+      }
+    }
 
-    if (feeStroops === null || budgetStroops === null) {
-      setError("Enter a max fee and daily budget greater than 0 XLM.");
-      return;
-    }
-    if (feeStroops > budgetStroops) {
-      setError("Max fee per transaction cannot exceed the daily budget.");
-      return;
-    }
+    // When disabling, send the existing saved values so the server record stays consistent.
+    const feeStroops = enabled
+      ? amountToStroops(maxFee)
+      : (config?.per_tx_fee_cap_stroops ?? null);
+    const budgetStroops = enabled
+      ? amountToStroops(dailyBudget)
+      : (config?.daily_budget_stroops ?? null);
 
     setSaving(true);
     try {

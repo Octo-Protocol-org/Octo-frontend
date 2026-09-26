@@ -23,6 +23,7 @@ import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { usePolling } from "@/lib/usePolling";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -93,11 +94,14 @@ export default function PaymentLinksPage({
 
   // Silently re-fetch so a just-received payment (collected total) shows up without a manual
   // refresh. Page 1 only — refreshing a deeper page would shift rows under the user.
-  useEffect(() => {
-    if (!token || pageIndex !== 0) return;
-    const interval = setInterval(() => load(null, { silent: true }), 5000);
-    return () => clearInterval(interval);
-  }, [token, pageIndex, load]);
+  const pollFn = useCallback(
+    async (_signal: AbortSignal) => {
+      if (!token || pageIndex !== 0) return;
+      await load(null, { silent: true });
+    },
+    [token, pageIndex, load],
+  );
+  usePolling(pollFn, 5000);
 
   function goNext() {
     if (!nextCursor) return;
