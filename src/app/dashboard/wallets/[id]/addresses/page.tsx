@@ -19,6 +19,7 @@ import { formatStroops, sumStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function AddressesPage({

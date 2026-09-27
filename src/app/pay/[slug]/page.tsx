@@ -23,6 +23,7 @@ import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
 import confetti from "canvas-confetti";
 import { formatStroops } from "@/lib/amount";
+import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 
 type Step = "loading" | "not-found" | "form" | "pay" | "confirmed";
 
@@ -329,9 +330,7 @@ export default function PayPage({
         return;
       }
       throw new Error(
-        result.detail?.includes("no_trust")
-          ? "Your wallet needs a USDC trustline before it can send USDC. Add one in Freighter, or use the deposit address instead."
-          : result.detail || "The payment could not be confirmed on-chain.",
+        friendlyResultMessage(result.detail, "The payment could not be confirmed on-chain."),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Freighter payment failed.");

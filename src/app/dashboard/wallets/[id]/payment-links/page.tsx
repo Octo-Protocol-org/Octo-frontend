@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import { PaymentLinkList } from "@/components/payment-links/PaymentLinkList";
@@ -22,6 +21,7 @@ import { usePolling } from "@/lib/usePolling";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 function payUrl(slug: string): string {

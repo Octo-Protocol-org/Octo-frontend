@@ -15,6 +15,7 @@ import { SpendableReservedBreakdown } from "@/components/assets/SpendableReserve
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — this page reads wallet
 // balances, matching the other /dashboard/wallets/:id/* pages.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function AssetsPage({

@@ -19,7 +19,6 @@ import {
   spendableNativeStroops,
 } from "@/lib/stellar/reserve";
 import { usePolling } from "@/lib/usePolling";
-import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
 import { TrustlineDetails } from "@/components/trustlines/TrustlineDetails";
 import { DownloadBackupButton } from "@/components/backup/DownloadBackupButton";
@@ -30,6 +29,7 @@ import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
 import { RelativeTime } from "@/components/RelativeTime";
 import { Skeleton, TableRowSkeleton } from "@/components/Skeleton";
 
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function WalletOverview({
   params,
 }: {
@@ -125,6 +125,7 @@ export default function WalletOverview({
       walletName={wallet?.label ?? "Master wallet"}
       section="Overview"
     >
+
           <div className="mx-auto w-full max-w-6xl space-y-6">
             {/* header */}
             <div>
@@ -354,7 +355,7 @@ export default function WalletOverview({
             </Panel>
           </div>
 
-    </WalletPageShell>
+      </WalletPageShell>
 
       {showDeposit && (
         <DepositModal
