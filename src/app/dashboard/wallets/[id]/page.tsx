@@ -26,6 +26,8 @@ import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletU
 import { PageSpinner } from "@/components/OctoSpinner";
 import { EditWalletDetails } from "@/components/wallets/EditWalletDetails";
 import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
+import { RelativeTime } from "@/components/RelativeTime";
+import { Skeleton, TableRowSkeleton } from "@/components/Skeleton";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function WalletOverview({
@@ -192,7 +194,19 @@ export default function WalletOverview({
             <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
               {/* assets */}
               <Panel title="Assets">
-                {balances.length === 0 ? (
+                {statsLoading ? (
+                  <ul className="divide-y divide-divider">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <li key={i} className="flex items-center justify-between py-3">
+                        <span className="flex items-center gap-3">
+                          <Skeleton width="2rem" height="2rem" className="rounded-full" />
+                          <Skeleton width="8rem" height="1rem" />
+                        </span>
+                        <Skeleton width="6rem" height="1rem" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : balances.length === 0 ? (
                   <Empty>No assets yet.</Empty>
                 ) : (
                   <ul className="divide-y divide-divider">
@@ -223,7 +237,16 @@ export default function WalletOverview({
 
               {/* addresses */}
               <Panel title="Addresses">
-                {addresses.length === 0 ? (
+                {statsLoading ? (
+                  <ul className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <li key={i}>
+                        <Skeleton width="80%" height="0.875rem" className="mb-1" />
+                        <Skeleton width="60%" height="0.75rem" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : addresses.length === 0 ? (
                   <Empty>No addresses generated yet.</Empty>
                 ) : (
                   <ul className="space-y-3">
@@ -248,62 +271,86 @@ export default function WalletOverview({
 
             {/* recent transactions */}
             <Panel title="Most recent transactions">
-              {txns.length === 0 ? (
+              {statsLoading ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <caption className="sr-only">Recent transactions for this wallet</caption>
+                    <thead className="text-xs text-muted">
+                      <tr>
+                        <th scope="col" className="py-2">ID</th>
+                        <th scope="col" className="py-2">Amount</th>
+                        <th scope="col" className="py-2">Hash</th>
+                        <th scope="col" className="py-2">Type</th>
+                        <th scope="col" className="py-2">Status</th>
+                        <th scope="col" className="py-2">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-divider">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <TableRowSkeleton key={i} cols={6} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : txns.length === 0 ? (
                 <Empty>No transactions yet.</Empty>
               ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-muted">
-                    <tr>
-                      <th className="py-2">ID</th>
-                      <th className="py-2">Amount</th>
-                      <th className="py-2">Hash</th>
-                      <th className="py-2">Type</th>
-                      <th className="py-2">Status</th>
-                      <th className="py-2">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-divider">
-                    {txns.map((t) => (
-                      <tr key={t.id} className="text-foreground/90">
-                        <td className="py-3 font-mono text-xs">
-                          {t.id.slice(0, 8)}…
-                        </td>
-                        <td className="py-3">
-                          {formatStroops(t.amount_stroops)}{" "}
-                          {t.asset_code === "native" ? "XLM" : t.asset_code}
-                        </td>
-                        <td className="py-3 font-mono text-xs">
-                          {t.stellar_tx_hash ? (
-                            <a
-                              href={`https://stellar.expert/explorer/testnet/tx/${t.stellar_tx_hash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="View transaction on Stellar Explorer"
-                              className="text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"
-                            >
-                              {`${t.stellar_tx_hash.slice(0, 8)}…`}
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="py-3">
-                          <span className="rounded-md bg-hover px-2 py-0.5 text-xs capitalize">
-                            {t.direction}
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          <span className="text-xs text-burgundy-bright capitalize">
-                            ● {t.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-xs text-muted">
-                          {new Date(t.created_at).toLocaleDateString()}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <caption className="sr-only">Recent transactions for this wallet</caption>
+                    <thead className="text-xs text-muted">
+                      <tr>
+                        <th scope="col" className="py-2">ID</th>
+                        <th scope="col" className="py-2">Amount</th>
+                        <th scope="col" className="py-2">Hash</th>
+                        <th scope="col" className="py-2">Type</th>
+                        <th scope="col" className="py-2">Status</th>
+                        <th scope="col" className="py-2">Date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-divider">
+                      {txns.map((t) => (
+                        <tr key={t.id} className="text-foreground/90">
+                          <td className="py-3 font-mono text-xs">
+                            {t.id.slice(0, 8)}…
+                          </td>
+                          <td className="py-3">
+                            {formatStroops(t.amount_stroops)}{" "}
+                            {t.asset_code === "native" ? "XLM" : t.asset_code}
+                          </td>
+                          <td className="py-3 font-mono text-xs">
+                            {t.stellar_tx_hash ? (
+                              <a
+                                href={`https://stellar.expert/explorer/testnet/tx/${t.stellar_tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="View transaction on Stellar Explorer"
+                                className="text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"
+                              >
+                                {`${t.stellar_tx_hash.slice(0, 8)}…`}
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="py-3">
+                            <span className="rounded-md bg-hover px-2 py-0.5 text-xs capitalize">
+                              {t.direction}
+                            </span>
+                          </td>
+                          <td className="py-3">
+                            <span className="text-xs text-burgundy-bright capitalize">
+                              ● {t.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-xs text-muted">
+                            <RelativeTime date={t.created_at} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </Panel>
           </div>

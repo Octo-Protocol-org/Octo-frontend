@@ -8,6 +8,7 @@ import {
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { formatStroops, sumStroops } from "@/lib/amount";
 import { CopyButton } from "@/components/CopyButton";
+import { RelativeTime } from "@/components/RelativeTime";
 
 const STATUS_BADGE: Record<string, string> = {
   confirmed: "bg-success-bg text-success",
@@ -81,13 +82,16 @@ export function SponsoredTransactionsTable({
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
+          <caption className="sr-only">
+            Sponsored transactions for this wallet
+          </caption>
           <thead className="text-xs uppercase tracking-wide text-muted">
             <tr>
-              <th className="py-2 pr-4">Date</th>
-              <th className="py-2 pr-4">Inner Tx Hash</th>
-              <th className="py-2 pr-4">Fee Bump Tx Hash</th>
-              <th className="py-2 pr-4">Fee</th>
-              <th className="py-2">Status</th>
+              <th scope="col" className="py-2 pr-4">Date</th>
+              <th scope="col" className="py-2 pr-4">Inner Tx Hash</th>
+              <th scope="col" className="py-2 pr-4">Fee Bump Tx Hash</th>
+              <th scope="col" className="py-2 pr-4">Fee</th>
+              <th scope="col" className="py-2">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-divider">
@@ -103,7 +107,7 @@ export function SponsoredTransactionsTable({
               rows.map((tx) => (
                 <tr key={tx.id} className="text-foreground/90">
                   <td className="py-3 pr-4 text-xs text-muted whitespace-nowrap">
-                    {formatDate(tx.created_at)}
+                    <RelativeTime date={tx.created_at} />
                   </td>
                   <td className="py-3 pr-4">
                     <HashCell hash={tx.inner_tx_hash} />
@@ -172,21 +176,4 @@ function EmptyRow({ children }: { children: React.ReactNode }) {
       </td>
     </tr>
   );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  const time = d.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  });
-  return `${date} · ${time} UTC`;
 }

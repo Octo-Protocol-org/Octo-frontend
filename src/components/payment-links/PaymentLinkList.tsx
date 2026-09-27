@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatStroops } from "@/lib/amount";
 import type { PaymentLink } from "@/lib/payment-links";
+import { RelativeTime } from "@/components/RelativeTime";
 
 function PaymentLinkRow({
   link,
@@ -19,7 +20,7 @@ function PaymentLinkRow({
       <td className="py-3 pr-4 text-foreground">{link.amount_usdc_stroops !== null ? `$${formatStroops(link.amount_usdc_stroops)}` : "Flexible"}</td>
       <td className="py-3 pr-4"><span className={`inline-flex items-center gap-1 text-xs ${link.active ? "text-success" : "text-muted"}`}>{link.active ? "●" : "○"} {link.active ? "Active" : "Inactive"}</span></td>
       <td className="py-3 pr-4 font-medium text-foreground">${formatStroops(link.collected_usdc_stroops)}</td>
-      <td className="py-3 pr-4 text-muted">{new Date(link.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</td>
+      <td className="py-3 pr-4 text-muted"><RelativeTime date={link.created_at} /></td>
       <td className="py-3 text-right">
         <Link href={`payment-links/${link.id}/edit`} onClick={(e) => e.stopPropagation()} className="mr-3 text-xs text-muted hover:text-foreground">Edit</Link>
         <button type="button" onClick={(e) => { e.stopPropagation(); onToggleActive(link); }} className="text-xs text-muted hover:text-foreground">{link.active ? "Deactivate" : "Activate"}</button>

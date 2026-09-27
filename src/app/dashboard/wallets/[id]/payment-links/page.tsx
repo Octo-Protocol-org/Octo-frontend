@@ -181,14 +181,17 @@ export default function PaymentLinksPage({
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
+                      <caption className="sr-only">
+                        {links.length} payment link{links.length === 1 ? "" : "s"} for this wallet
+                      </caption>
                       <thead>
                         <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
-                          <th className="pb-3 pr-4 font-medium">Name</th>
-                          <th className="pb-3 pr-4 font-medium">Amount</th>
-                          <th className="pb-3 pr-4 font-medium">Status</th>
-                          <th className="pb-3 pr-4 font-medium">Collected</th>
-                          <th className="pb-3 pr-4 font-medium">Created</th>
-                          <th className="pb-3 font-medium"></th>
+                          <th scope="col" className="pb-3 pr-4 font-medium">Name</th>
+                          <th scope="col" className="pb-3 pr-4 font-medium">Amount</th>
+                          <th scope="col" className="pb-3 pr-4 font-medium">Status</th>
+                          <th scope="col" className="pb-3 pr-4 font-medium">Collected</th>
+                          <th scope="col" className="pb-3 pr-4 font-medium">Created</th>
+                          <th scope="col" className="pb-3 font-medium"><span className="sr-only">Actions</span></th>
                         </tr>
                       </thead>
                       <PaymentLinkList

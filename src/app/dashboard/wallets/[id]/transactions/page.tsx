@@ -15,6 +15,7 @@ import { PageSpinner } from "@/components/OctoSpinner";
 import { formatStroops } from "@/lib/amount";
 import { usePolling } from "@/lib/usePolling";
 import { ExportTransactionsCsvButton } from "@/components/export/ExportTransactionsCsvButton";
+import { RelativeTime } from "@/components/RelativeTime";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -208,14 +209,17 @@ export default function TransactionsPage({
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
+                    <caption className="sr-only">
+                      {filtered.length} transaction{filtered.length === 1 ? "" : "s"} for this wallet
+                    </caption>
                     <thead>
                       <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
-                        <th className="pb-3 pr-4 font-medium">Type</th>
-                        <th className="pb-3 pr-4 font-medium">Amount</th>
-                        <th className="pb-3 pr-4 font-medium">Counterparty</th>
-                        <th className="pb-3 pr-4 font-medium">Status</th>
-                        <th className="pb-3 pr-4 font-medium">Tx hash</th>
-                        <th className="pb-3 font-medium">Date</th>
+                        <th scope="col" className="pb-3 pr-4 font-medium">Type</th>
+                        <th scope="col" className="pb-3 pr-4 font-medium">Amount</th>
+                        <th scope="col" className="pb-3 pr-4 font-medium">Counterparty</th>
+                        <th scope="col" className="pb-3 pr-4 font-medium">Status</th>
+                        <th scope="col" className="pb-3 pr-4 font-medium">Tx hash</th>
+                        <th scope="col" className="pb-3 font-medium">Date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-divider">
@@ -299,11 +303,7 @@ function TxRow({
           : "—"}
       </td>
       <td className="py-3 text-muted">
-        {new Date(tx.created_at).toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
+        <RelativeTime date={tx.created_at} />
       </td>
     </tr>
   );
