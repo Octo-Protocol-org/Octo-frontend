@@ -14,6 +14,7 @@ import { Modal } from "@/components/dashboard/Modal";
 import { ApiError } from "@/lib/api";
 import { toast } from "sonner";
 
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function DevelopersPage({

@@ -4,14 +4,13 @@ import { use } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
-import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
-import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { GasTankProvision } from "@/components/gas/GasTankProvision";
 import { PageSpinner } from "@/components/OctoSpinner";
 
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function GasTankPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading } = useAuth();
   const { wallet } = useWallet(id);
 
   if (loading || !user || !token) return <PageSpinner />;

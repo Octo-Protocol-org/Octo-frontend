@@ -10,6 +10,7 @@ import { PageSpinner } from "@/components/OctoSpinner";
 import { EditPaymentLinkForm } from "@/components/payment-links/EditPaymentLinkForm";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies, like the other wallet pages.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function EditPaymentLinkPage({

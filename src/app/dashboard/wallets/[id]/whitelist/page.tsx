@@ -18,6 +18,7 @@ import { PageSpinner } from "@/components/OctoSpinner";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 // Accepts only well-formed Stellar account (G…) or muxed account (M…) addresses.

@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api";
 import type { Balance } from "@/lib/wallets";
 import { DEFAULT_BASE_RESERVE_STROOPS } from "@/lib/stellar/reserve";
 import { buildSignedChangeTrust, getSigningInfo, submitSigned, unlockWallet } from "@/lib/sdk";
+import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 
 const RESERVE_XLM = DEFAULT_BASE_RESERVE_STROOPS / 10_000_000;
 
@@ -51,11 +52,13 @@ export function TrustlineDetails({
         setRemoving(null);
         onChanged();
       } else {
-        toast.error(res.detail ?? `Removal ${res.status}.`);
+        toast.error(friendlyResultMessage(res.detail, `Removal ${res.status}.`));
       }
     } catch (err) {
       toast.error(
-        err instanceof ApiError || err instanceof Error ? err.message : "Could not remove the trustline.",
+        err instanceof ApiError || err instanceof Error
+          ? friendlyResultMessage(err.message, "Could not remove the trustline.")
+          : "Could not remove the trustline.",
       );
     } finally {
       setPassword("");

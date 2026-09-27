@@ -88,8 +88,10 @@ export function TrustlineModal({
           <p className="mt-1 text-sm text-muted">
             {ok
               ? "This wallet can now receive USDC."
-              : result.detail ??
-                "The trustline could not be established. Ensure the wallet holds enough XLM for the reserve."}
+              : friendlyResultMessage(
+                  result.detail,
+                  "The trustline could not be established. Ensure the wallet holds enough XLM for the reserve.",
+                )}
           </p>
           {result.hash && (
             <a

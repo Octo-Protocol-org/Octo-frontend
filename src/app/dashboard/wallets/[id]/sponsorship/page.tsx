@@ -15,6 +15,7 @@ import { ApiError } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { formatStroops } from "@/lib/amount";
 
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function SponsorshipSettingsPage({
   params,
 }: {

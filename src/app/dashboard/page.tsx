@@ -130,17 +130,36 @@ export default function DashboardHome() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-burgundy-soft/20 p-10 text-center">
-      <p className="text-foreground">No master wallets yet</p>
-      <p className="mt-1 text-sm text-muted">
-        Create your first master wallet to start receiving deposits.
-      </p>
-      <Link
-        href="/dashboard/wallets/new"
-        className="mt-5 inline-block rounded-full glass-btn-primary px-5 py-2.5 text-sm font-medium"
-      >
-        New Master Wallet
-      </Link>
+    <div className="rounded-2xl border border-dashed border-border bg-burgundy-soft/20 p-8 sm:p-10">
+      <div className="mx-auto max-w-xl text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-burgundy/30 text-2xl text-burgundy-bright">
+          ◷
+        </div>
+        <p className="mt-5 text-lg font-semibold text-foreground">Your wallet workspace is ready</p>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          Create a master wallet to receive deposits, manage balances, and send assets on Stellar.
+        </p>
+        <div className="mt-6 grid gap-3 text-left sm:grid-cols-3">
+          {[
+            ["1", "Create", "Set up your first master wallet."],
+            ["2", "Receive", "Generate deposit addresses for customers."],
+            ["3", "Manage", "Track balances and transactions in one place."],
+          ].map(([number, title, description]) => (
+            <div key={number} className="rounded-xl border border-border bg-surface/50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-burgundy-bright">
+                {number} · {title}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
+            </div>
+          ))}
+        </div>
+        <Link
+          href="/dashboard/wallets/new"
+          className="mt-7 inline-block rounded-full glass-btn-primary px-5 py-2.5 text-sm font-medium"
+        >
+          Create a master wallet
+        </Link>
+      </div>
     </div>
   );
 }
