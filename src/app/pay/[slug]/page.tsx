@@ -17,7 +17,7 @@ import {
   type PaymentIntent,
   type PaymentStatus,
 } from "@/lib/payment-links";
-import { USDC_TESTNET } from "@/lib/wallets";
+import { usdcForNetwork } from "@/lib/networkConfig";
 import { buildUnsignedPayment } from "@/lib/sdk";
 import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
@@ -95,6 +95,8 @@ export default function PayPage({
   const intentRef = useRef<{ intent: PaymentIntent; key: string; createdAt: number } | null>(null);
   // Guards confirmation side-effects (confetti, redirect) so they run exactly once.
   const confirmedRef = useRef(false);
+  // Network passphrase received from signing-info; used to resolve the correct USDC issuer.
+  const [networkPassphrase, setNetworkPassphrase] = useState<string>("");
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -301,6 +303,8 @@ export default function PayPage({
 
       // Sequence must be the PAYER's own (it's the tx source), not the merchant's.
       const info = await getPublicSigningInfo(slug, access.address);
+      setNetworkPassphrase(info.network_passphrase);
+      const usdc = usdcForNetwork(info.network_passphrase);
 
       // Verify Freighter is on the same network before touching the transaction.
       const networkDetails = await freighter.getNetworkDetails();
@@ -313,7 +317,7 @@ export default function PayPage({
       const unsignedXdr = buildUnsignedPayment(access.address, info, {
         destination: intent.deposit_address,
         amount: formatStroops(intent.amount_usdc_stroops),
-        asset: USDC_TESTNET,
+        asset: usdc,
       });
 
       const signed = await freighter.signTransaction(unsignedXdr, {
@@ -509,8 +513,8 @@ export default function PayPage({
                     value={sep7PayUri({
                       destination: intent.deposit_address,
                       amount: formatStroops(intent.amount_usdc_stroops),
-                      assetCode: USDC_TESTNET.code,
-                      assetIssuer: USDC_TESTNET.issuer,
+                      assetCode: usdcForNetwork(networkPassphrase).code,
+                      assetIssuer: usdcForNetwork(networkPassphrase).issuer,
                     })}
                     label="Scan with a Stellar wallet to pay the exact amount"
                   />

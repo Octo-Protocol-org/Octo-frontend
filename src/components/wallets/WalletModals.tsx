@@ -6,7 +6,7 @@ import { OtpInput } from "@/components/auth/OtpInput";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { DepositQrCodes } from "@/components/qr/DepositQrCodes";
 import { ApiError } from "@/lib/api";
-import { USDC_TESTNET, type Address, type Balance } from "@/lib/wallets";
+import { usdcForNetwork, type Address, type Balance } from "@/lib/wallets";
 import {
   unlockWallet, getSigningInfo, submitSigned, requestWithdrawOtp, confirmWithdraw,
   getAccountExists, buildSignedPayment, buildSignedChangeTrust, buildSignedCreateAccount,
@@ -49,8 +49,9 @@ export function TrustlineModal({
       // browser, then relay the signed XDR. The private key never leaves this device.
       const keypair = await unlockWallet(token, walletId, password);
       const info = await getSigningInfo(token, walletId);
+      const usdc = usdcForNetwork(info.network_passphrase);
       const signedXdr = buildSignedChangeTrust(keypair, info, {
-        asset: { code: USDC_TESTNET.code, issuer: USDC_TESTNET.issuer },
+        asset: { code: usdc.code, issuer: usdc.issuer },
       });
       const res: SubmitResult = await submitSigned(token, walletId, signedXdr);
       setResult({
@@ -127,11 +128,9 @@ export function TrustlineModal({
         <p className="text-muted">
           Asset: <span className="text-foreground">USDC</span>
         </p>
-        <p className="break-all text-muted">
-          Issuer:{" "}
-          <span className="font-mono text-foreground">{USDC_TESTNET.issuer}</span>
+        <p className="text-muted">
+          Issuer resolved from your wallet&apos;s network at signing time.
         </p>
-        <p className="text-muted">Network: Stellar Testnet</p>
       </div>
 
       <div className="mt-4">

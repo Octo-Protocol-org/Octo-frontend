@@ -220,18 +220,8 @@ export function amountToStroops(xlm: string): number | null {
   return toApiStroops(parseAmount(xlm));
 }
 
-/**
- * The most widely-used USDC issuer on the Stellar **testnet** (~45k trustlines) —
- * the one testnet faucets/tutorials mint against. auth_required=false, so a
- * trustline just works (it is auth_revocable, which is harmless on testnet).
- * Testnet has no single "canonical" Circle USDC the way mainnet does.
- * (Mainnet USDC is GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN —
- * wire this up per-network when mainnet lands.)
- */
-export const USDC_TESTNET = {
-  code: "USDC",
-  issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-} as const;
+/** Re-export so callers can resolve the correct USDC issuer for a given network passphrase. */
+export { usdcForNetwork } from "./networkConfig";
 
 // Withdrawals and trustlines are now built + signed CLIENT-SIDE via `@/lib/sdk` and relayed
 // through `submitSigned` — the server holds no key to sign them. The old custodial
