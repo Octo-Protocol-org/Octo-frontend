@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
-import { listAuditLogs, type AuditLog } from "@/lib/audit";
+import { listAuditLogsPage, type AuditLog } from "@/lib/audit";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 
@@ -29,19 +30,47 @@ export default function AuditLogsPage() {
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
 
-  const load = useCallback(() => {
-    if (!token) return;
-    setLogs(null);
-    listAuditLogs(token, { category, search })
-      .then(setLogs)
-      .catch(() => setLogs([]));
-  }, [token, category, search]);
+  // Cursor stack: index 0 = page 1 (no cursor), each subsequent entry is the next_cursor.
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    (before: string | null) => {
+      if (!token) return;
+      setLogs(null);
+      listAuditLogsPage(token, { category, search, before })
+        .then((page) => {
+          setLogs(page.data);
+          setNextCursor(page.next_cursor);
+        })
+        .catch(() => setLogs([]));
+    },
+    [token, category, search],
+  );
 
   useEffect(() => {
-    // Debounce search; refetch on category change immediately.
-    const t = setTimeout(load, search ? 350 : 0);
+    // Reset to page 1 whenever filters change.
+    setCursors([null]);
+    setPageIndex(0);
+    setNextCursor(null);
+    const t = setTimeout(() => load(null), search ? 350 : 0);
     return () => clearTimeout(t);
   }, [load, search]);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    load(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    load(target ?? null);
+  }
 
   if (loading || !user) {
     return (
@@ -131,6 +160,15 @@ export default function AuditLogsPage() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          page={pageIndex + 1}
+          hasPrev={pageIndex > 0}
+          hasNext={nextCursor !== null}
+          loading={logs === null}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
 
         {logs && logs.length > 0 && (
           <p className="mt-4 text-xs text-muted">

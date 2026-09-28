@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { displayName } from "@/lib/auth";
-import { listWallets, type WalletView } from "@/lib/wallets";
+import { listWalletsPage, type WalletView } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
 
 export const dynamic = "force-dynamic";
@@ -22,36 +23,64 @@ export default function DashboardHome() {
     Map<string, SponsorshipConfig | null>
   >(new Map());
 
-  useEffect(() => {
-    if (!token) return;
-    let aborted = false;
-    listWallets(token)
-      .then(async (ws) => {
-        if (aborted) return;
-        setWallets(ws);
-        // Fetch sponsorship configs in parallel so the wallet list never has to wait on them.
-        // A single failed sponsorship fetch must not blank out the whole row.
-        const results = await Promise.allSettled(
-          ws.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
-        );
-        if (aborted) return;
-        const map = new Map<string, SponsorshipConfig | null>();
-        ws.forEach((w, i) => {
-          const r = results[i];
-          map.set(w.id, r.status === "fulfilled" ? r.value : null);
+  // Cursor stack for wallet pagination.
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingPage, setLoadingPage] = useState(false);
+
+  const loadPage = useCallback(
+    (before: string | null) => {
+      if (!token) return;
+      let aborted = false;
+      setLoadingPage(true);
+      setWallets(null);
+      listWalletsPage(token, { before })
+        .then(async (page) => {
+          if (aborted) return;
+          setWallets(page.data);
+          setNextCursor(page.next_cursor);
+          // Fetch sponsorship configs for the visible page in parallel.
+          const results = await Promise.allSettled(
+            page.data.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
+          );
+          if (aborted) return;
+          const map = new Map<string, SponsorshipConfig | null>();
+          page.data.forEach((w, i) => {
+            const r = results[i];
+            map.set(w.id, r.status === "fulfilled" ? r.value : null);
+          });
+          setSponsorshipByWalletId(map);
+        })
+        .catch(() => {
+          if (!aborted) setWallets([]);
+        })
+        .finally(() => {
+          if (!aborted) setLoadingPage(false);
         });
-        setSponsorshipByWalletId(map);
-      })
-      .catch(() => {
-        // Gate on the same `aborted` flag the .then already uses so we don't call
-        // setState on an unmounted component when listWallets rejects late.
-        if (aborted) return;
-        setWallets([]);
-      });
-    return () => {
-      aborted = true;
-    };
+      return () => { aborted = true; };
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    loadPage(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    loadPage(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    loadPage(target ?? null);
+  }
 
   if (loading || !user) {
     return (
@@ -122,6 +151,14 @@ export default function DashboardHome() {
               ))}
             </div>
           )}
+          <Pagination
+            page={pageIndex + 1}
+            hasPrev={pageIndex > 0}
+            hasNext={nextCursor !== null}
+            loading={loadingPage}
+            onPrev={goPrev}
+            onNext={goNext}
+          />
         </div>
       </div>
     </DashboardShell>
