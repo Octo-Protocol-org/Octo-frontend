@@ -3,7 +3,7 @@
 import { ExportCsvButton } from "./ExportCsvButton";
 import { fetchAllPages, type CsvColumn } from "@/lib/csv";
 import { formatStroops } from "@/lib/amount";
-import { listAddresses, listTransactionsPage, type Transaction } from "@/lib/wallets";
+import { listRecentAddresses, listTransactionsPage, type Transaction } from "@/lib/wallets";
 
 type Row = Transaction & { customerRef: string | null };
 
@@ -33,7 +33,8 @@ export function ExportTransactionsCsvButton({
     if (!token) throw new Error("Not signed in.");
     const [rows, addrs] = await Promise.all([
       fetchAllPages((before) => listTransactionsPage(token, walletId, { before, limit: 200 })),
-      listAddresses(token, walletId).catch(() => []),
+      // Fetch up to 200 addresses for customer-ref enrichment; a failed lookup only blanks that column.
+      listRecentAddresses(token, walletId, 200).catch(() => []),
     ]);
     const refs = new Map<string, string>();
     for (const a of addrs) if (a.customer_ref) refs.set(a.id, a.customer_ref);

@@ -6,14 +6,15 @@ import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
   getBalances,
-  listAddresses,
-  listTransactions,
+  listRecentAddresses,
+  listRecentTransactions,
   createAddress,
   USDC_TESTNET,
   type Balance,
   type Address,
   type Transaction,
 } from "@/lib/wallets";
+import { explorerTxUrl } from "@/lib/network";
 import { parseAmount, formatStroops } from "@/lib/amount";
 import {
   spendableNativeStroops,
@@ -53,17 +54,15 @@ export default function WalletOverview({
   function refresh() {
     if (!token) return;
     getBalances(token, id).then(setBalances).catch(() => {});
-    // The submit-signed endpoint records the outbound transfer server-side before responding,
-    // so a plain re-fetch reflects it (no optimistic insert needed).
-    listTransactions(token, id).then(setTxns).catch(() => {});
+    listRecentTransactions(token, id).then(setTxns).catch(() => {});
   }
 
   useEffect(() => {
     if (!token) return;
     Promise.all([
       getBalances(token, id).then(setBalances).catch(() => setBalances([])),
-      listAddresses(token, id).then(setAddresses).catch(() => setAddresses([])),
-      listTransactions(token, id).then(setTxns).catch(() => setTxns([])),
+      listRecentAddresses(token, id).then(setAddresses).catch(() => setAddresses([])),
+      listRecentTransactions(token, id).then(setTxns).catch(() => setTxns([])),
     ]).finally(() => setStatsLoading(false));
   }, [token, id]);
 
@@ -74,7 +73,7 @@ export default function WalletOverview({
       if (!token) return;
       await Promise.all([
         getBalances(token, id).then(setBalances).catch(() => {}),
-        listTransactions(token, id).then(setTxns).catch(() => {}),
+        listRecentTransactions(token, id).then(setTxns).catch(() => {}),
       ]);
     },
     [token, id],
@@ -321,7 +320,7 @@ export default function WalletOverview({
                           <td className="py-3 font-mono text-xs">
                             {t.stellar_tx_hash ? (
                               <a
-                                href={`https://stellar.expert/explorer/testnet/tx/${t.stellar_tx_hash}`}
+                                href={explorerTxUrl(t.stellar_tx_hash)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="View transaction on Stellar Explorer"

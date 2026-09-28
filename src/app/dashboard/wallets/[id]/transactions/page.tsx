@@ -8,6 +8,7 @@ import {
   displayAssetCode,
   type Transaction,
 } from "@/lib/wallets";
+import { explorerTxUrl } from "@/lib/network";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
@@ -383,7 +384,7 @@ function TransactionDetail({
 
         {tx.stellar_tx_hash && (
           <a
-            href={`https://stellar.expert/explorer/testnet/tx/${tx.stellar_tx_hash}`}
+            href={explorerTxUrl(tx.stellar_tx_hash)}
             target="_blank"
             rel="noopener noreferrer"
             className="block text-center text-xs text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"

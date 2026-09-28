@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
+import { network } from "@/lib/network";
 
 type WalletPageShellProps = {
   walletId: string;
@@ -26,9 +27,12 @@ export function WalletPageShell({
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
       <DashboardBackground />
-      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
-        You are currently on <strong>test mode</strong> (Stellar testnet).
-      </div>
+      {/* Banner is only rendered on testnet — on mainnet this would mislead users. */}
+      {network.isTestnet && (
+        <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
+          You are currently on <strong>test mode</strong> (Stellar {network.displayName}).
+        </div>
+      )}
       <div className="relative z-10 flex flex-1">
         <WalletSidebar
           walletId={walletId}
