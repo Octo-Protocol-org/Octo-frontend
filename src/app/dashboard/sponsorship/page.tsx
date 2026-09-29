@@ -21,10 +21,12 @@ type WalletSponsorship = {
 export default function SponsorshipPage() {
   const { user, token, loading, logout } = useAuth();
   const [rows, setRows] = useState<WalletSponsorship[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadData(signal?: AbortSignal) {
     if (!token) return;
-    listWallets(token)
+    setLoadError(null);
+    listWallets(token, { signal })
       .then(async (wallets) => {
         // Only the sponsorship config is fetched per wallet — not full wallet details.
         const configs = await Promise.all(
@@ -35,7 +37,19 @@ export default function SponsorshipPage() {
         return wallets.map((wallet, i) => ({ wallet, config: configs[i] }));
       })
       .then(setRows)
-      .catch(() => setRows([]));
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setRows([]);
+        setLoadError(e instanceof Error ? e.message : "Could not load sponsorship data.");
+      });
+  }
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   if (loading || !user) {
@@ -66,6 +80,18 @@ export default function SponsorshipPage() {
         </section>
 
         {/* Per-wallet cards */}
+        {loadError && (
+          <div role="alert" className="rounded-xl border border-danger-border bg-danger-bg px-4 py-3 text-sm text-danger flex items-center justify-between gap-4">
+            <span>{loadError}</span>
+            <button
+              type="button"
+              onClick={() => loadData()}
+              className="shrink-0 rounded-lg border border-danger-border px-3 py-1 text-xs font-medium hover:bg-danger-border/20"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {rows === null ? (
           <p className="py-10 text-center text-sm text-muted">Loading wallets…</p>
         ) : rows.length === 0 ? (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { useWallet } from "@/lib/useWallet";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 
@@ -21,7 +22,47 @@ export function WalletPageShell({
   children,
 }: WalletPageShellProps) {
   const { logout } = useAuth();
+  const { notFound, error, loading } = useWallet(walletId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Render not-found / error states before any wallet-specific content to prevent a fake wallet
+  // UI from appearing for unknown or foreign wallet IDs.
+  if (!loading && (notFound || error)) {
+    return (
+      <div className="relative flex min-h-screen flex-col bg-background">
+        <DashboardBackground />
+        <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 text-center">
+          {notFound ? (
+            <div className="space-y-4">
+              <p className="text-4xl">🔍</p>
+              <h1 className="text-xl font-semibold text-foreground">Wallet not found</h1>
+              <p className="text-sm text-muted">
+                This wallet doesn&apos;t exist or you don&apos;t have access to it.
+              </p>
+              <Link
+                href="/dashboard"
+                className="inline-block rounded-lg glass-btn-primary px-4 py-2 text-sm font-semibold"
+              >
+                ← My Wallets
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-4xl">⚠️</p>
+              <h1 className="text-xl font-semibold text-foreground">Could not load wallet</h1>
+              <p className="text-sm text-muted">{error?.message ?? "An unexpected error occurred."}</p>
+              <Link
+                href="/dashboard"
+                className="inline-block rounded-lg glass-btn-primary px-4 py-2 text-sm font-semibold"
+              >
+                ← My Wallets
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background">

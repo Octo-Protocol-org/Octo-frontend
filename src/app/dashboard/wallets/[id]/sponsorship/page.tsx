@@ -38,6 +38,7 @@ export default function SponsorshipSettingsPage({
 
   useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
     getSponsorshipConfig(asAuthToken(token), asWalletId(id))
       .then((c) => {
         setConfig(c);
@@ -53,7 +54,12 @@ export default function SponsorshipSettingsPage({
             : "",
         );
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        // Surface the failure so the user knows the config didn't load.
+        setError(e instanceof Error ? e.message : "Could not load sponsorship config.");
+      });
+    return () => controller.abort();
   }, [token, id]);
 
   async function onSave() {

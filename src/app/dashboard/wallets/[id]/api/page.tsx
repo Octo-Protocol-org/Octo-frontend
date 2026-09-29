@@ -35,9 +35,14 @@ export default function DevelopersPage({
 
   useEffect(() => {
     if (!token) return;
-    getApiKey(token, id)
+    const controller = new AbortController();
+    getApiKey(token, id, { signal: controller.signal })
       .then(setKeyInfo)
-      .catch(() => setKeyLoadFailed(true));
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setKeyLoadFailed(true);
+      });
+    return () => controller.abort();
   }, [token, id]);
 
   // Until key status is known we can't tell "generate" from "regenerate", so block the action.

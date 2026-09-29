@@ -22,7 +22,7 @@ import { usePolling } from "@/lib/usePolling";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
 import { TrustlineDetails } from "@/components/trustlines/TrustlineDetails";
 import { DownloadBackupButton } from "@/components/backup/DownloadBackupButton";
-import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
+import { Stat, ActionButton, Panel, Empty, ErrorState } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { EditWalletDetails } from "@/components/wallets/EditWalletDetails";
 import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
@@ -42,6 +42,7 @@ export default function WalletOverview({
   const [balances, setBalances] = useState<Balance[]>([]);
   // True until the first successful balances + addresses fetch completes.
   const [statsLoading, setStatsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [creating, setCreating] = useState(false);
@@ -60,11 +61,24 @@ export default function WalletOverview({
 
   useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
+    setLoadError(null);
     Promise.all([
-      getBalances(token, id).then(setBalances).catch(() => setBalances([])),
-      listAddresses(token, id).then(setAddresses).catch(() => setAddresses([])),
-      listTransactions(token, id).then(setTxns).catch(() => setTxns([])),
+      getBalances(token, id, { signal: controller.signal }).then(setBalances).catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setBalances([]);
+        setLoadError(e instanceof Error ? e.message : "Could not load wallet data.");
+      }),
+      listAddresses(token, id, { signal: controller.signal }).then(setAddresses).catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setAddresses([]);
+      }),
+      listTransactions(token, id, { signal: controller.signal }).then(setTxns).catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setTxns([]);
+      }),
     ]).finally(() => setStatsLoading(false));
+    return () => controller.abort();
   }, [token, id]);
 
   // Silently re-fetch balances + recent transactions in the background so a new deposit shows up
@@ -72,9 +86,10 @@ export default function WalletOverview({
   const pollFn = useCallback(
     async () => {
       if (!token) return;
+      const controller = new AbortController();
       await Promise.all([
-        getBalances(token, id).then(setBalances).catch(() => {}),
-        listTransactions(token, id).then(setTxns).catch(() => {}),
+        getBalances(token, id, { signal: controller.signal }).then(setBalances).catch(() => {}),
+        listTransactions(token, id, { signal: controller.signal }).then(setTxns).catch(() => {}),
       ]);
     },
     [token, id],
@@ -127,9 +142,21 @@ export default function WalletOverview({
     >
 
           <div className="mx-auto w-full max-w-6xl space-y-6">
+            {loadError && (
+              <ErrorState message={loadError} onRetry={() => {
+                setStatsLoading(true);
+                setLoadError(null);
+                if (token) {
+                  Promise.all([
+                    getBalances(token, id).then(setBalances).catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load wallet data.")),
+                    listAddresses(token, id).then(setAddresses).catch(() => {}),
+                    listTransactions(token, id).then(setTxns).catch(() => {}),
+                  ]).finally(() => setStatsLoading(false));
+                }
+              }} />
+            )}
             {/* header */}
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">
+            <div>              <h1 className="text-2xl font-semibold text-foreground">
                 {wallet?.label ?? "Master wallet"}
               </h1>
               <p className="mt-1 text-sm text-muted">

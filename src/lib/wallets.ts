@@ -131,27 +131,28 @@ export function createGasTank(token: string, id: string) {
  * missing from the dashboard.
  */
 /** List the authenticated user's wallets (newest first). */
-export async function listWallets(token: string): Promise<WalletView[]> {
-  const page = await apiFetch<Paginated<WalletView>>("/v1/wallets", { token });
+export async function listWallets(token: string, opts?: { signal?: AbortSignal }): Promise<WalletView[]> {
+  const page = await apiFetch<Paginated<WalletView>>("/v1/wallets", { token, signal: opts?.signal });
   return page.data;
 }
 
-export function getWallet(token: string, id: string) {
-  return apiFetch<WalletView>(path`/v1/wallets/${id}`, { token });
+export function getWallet(token: string, id: string, opts?: { signal?: AbortSignal }) {
+  return apiFetch<WalletView>(path`/v1/wallets/${id}`, { token, signal: opts?.signal });
 }
 
 // Balances come straight from Horizon and are not paginated — a flat array here is correct.
-export function getBalances(token: string, id: string) {
-  return apiFetch<Balance[]>(path`/v1/wallets/${id}/balances`, { token });
+export function getBalances(token: string, id: string, opts?: { signal?: AbortSignal }) {
+  return apiFetch<Balance[]>(path`/v1/wallets/${id}/balances`, { token, signal: opts?.signal });
 }
 
 export async function listAddresses(
   token: string,
   id: string,
+  opts?: { signal?: AbortSignal },
 ): Promise<Address[]> {
   const page = await apiFetch<Paginated<Address>>(
     path`/v1/wallets/${id}/addresses`,
-    { token },
+    { token, signal: opts?.signal },
   );
   return page.data;
 }
@@ -171,10 +172,11 @@ export function createAddress(
 export async function listTransactions(
   token: string,
   id: string,
+  opts?: { signal?: AbortSignal },
 ): Promise<Transaction[]> {
   const page = await apiFetch<Paginated<Transaction>>(
     path`/v1/wallets/${id}/transactions`,
-    { token },
+    { token, signal: opts?.signal },
   );
   return page.data;
 }
@@ -250,8 +252,8 @@ export type GeneratedKey = {
 };
 
 /** Metadata about the wallet's API key (prefix + whether configured) — never the secret. */
-export function getApiKey(token: string, id: string) {
-  return apiFetch<ApiKeyInfo>(path`/v1/wallets/${id}/api-key`, { token });
+export function getApiKey(token: string, id: string, opts?: { signal?: AbortSignal }) {
+  return apiFetch<ApiKeyInfo>(path`/v1/wallets/${id}/api-key`, { token, signal: opts?.signal });
 }
 
 /** Generate (or regenerate) the wallet's API key. Returns the full key once. */
