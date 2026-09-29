@@ -263,7 +263,8 @@ export function WithdrawModal({
     })),
   ];
 
-  const [selectedCode, setSelectedCode] = useState(assets[0].code);
+  const defaultAsset: WithdrawAsset = { code: "XLM", available: "0" };
+  const [selectedCode, setSelectedCode] = useState((assets[0] ?? defaultAsset).code);
   const [destination, setDestination] = useState("");
   const [amount, setAmount] = useState("");
   const [password, setPassword] = useState("");
@@ -288,7 +289,7 @@ export function WithdrawModal({
   const resendCooldown = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
 
   const selected =
-    assets.find((a) => a.code === selectedCode) ?? assets[0];
+    assets.find((a) => a.code === selectedCode) ?? assets[0] ?? defaultAsset;
 
   useEffect(() => {
     getSigningInfo(token, walletId).then(setReserveInfo).catch(() => {});
