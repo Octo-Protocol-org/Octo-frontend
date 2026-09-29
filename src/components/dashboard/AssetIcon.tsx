@@ -1,4 +1,10 @@
-import { USDC_TESTNET } from "@/lib/wallets";
+import { usdcForNetwork, NETWORK_PASSPHRASE_MAINNET, NETWORK_PASSPHRASE_TESTNET } from "@/lib/networkConfig";
+
+// Known USDC issuers — display the brand icon for either network's canonical issuer.
+const KNOWN_USDC_ISSUERS = new Set([
+  usdcForNetwork(NETWORK_PASSPHRASE_MAINNET).issuer,
+  usdcForNetwork(NETWORK_PASSPHRASE_TESTNET).issuer,
+]);
 
 // The white disc is each asset mark's own backdrop — the glyphs are solid black, so it stays
 // white in both themes rather than following the surface tokens.
@@ -45,7 +51,7 @@ export function AssetIcon({
   className?: string;
 }) {
   if (isNative) return <XlmIcon className={className} />;
-  if (code === USDC_TESTNET.code && issuer === USDC_TESTNET.issuer) {
+  if (code === "USDC" && issuer && KNOWN_USDC_ISSUERS.has(issuer)) {
     return <UsdcIcon className={className} />;
   }
   return (

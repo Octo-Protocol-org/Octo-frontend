@@ -3,6 +3,8 @@
 import { use, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TrustlineModal, DepositModal, WithdrawModal } from "@/components/wallets/WalletModals";
+import { RecoverWalletModal } from "@/components/wallets/RecoverWalletModal";
+import { ChangeWalletPasswordModal } from "@/components/wallets/ChangeWalletPasswordModal";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
@@ -10,11 +12,12 @@ import {
   listRecentAddresses,
   listRecentTransactions,
   createAddress,
-  USDC_TESTNET,
+  usdcForNetwork,
   type Balance,
   type Address,
   type Transaction,
 } from "@/lib/wallets";
+import { NETWORK_PASSPHRASE_TESTNET } from "@/lib/networkConfig";
 import { explorerTxUrl } from "@/lib/network";
 import { parseAmount, formatStroops } from "@/lib/amount";
 import {
@@ -51,6 +54,8 @@ export default function WalletOverview({
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showTrustline, setShowTrustline] = useState(false);
+  const [showRecover, setShowRecover] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   function refresh() {
     if (!token) return;
@@ -106,8 +111,10 @@ export default function WalletOverview({
 
   const xlm = balances.find((b) => b.asset_type === "native");
   const xlmAmount = xlm ? xlm.balance : "0";
+  // Use testnet passphrase as the display default; the balance issuer check is exact.
+  const usdc = usdcForNetwork(NETWORK_PASSPHRASE_TESTNET);
   const usdcBalance = balances.find(
-    (b) => b.asset_code === USDC_TESTNET.code && b.asset_issuer === USDC_TESTNET.issuer,
+    (b) => b.asset_code === usdc.code && b.asset_issuer === usdc.issuer,
   );
   const hasUsdc = usdcBalance !== undefined;
   // Spendable XLM is derived client-side; show "—" until balances load to avoid fake zeros.
@@ -188,6 +195,8 @@ export default function WalletOverview({
                 label="Refresh balances"
                 onClick={() => token && getBalances(token, id).then(setBalances)}
               />
+              <ActionButton label="Recover wallet" onClick={() => setShowRecover(true)} />
+              <ActionButton label="Change wallet password" onClick={() => setShowChangePassword(true)} />
             </div>
 
             {token && <TrustlineDetails token={token} walletId={id} balances={balances} onChanged={refresh} />}
@@ -390,6 +399,23 @@ export default function WalletOverview({
             setShowTrustline(false);
             refresh();
           }}
+        />
+      )}
+      {showRecover && token && wallet?.address && (
+        <RecoverWalletModal
+          token={token}
+          walletId={id}
+          walletAddress={wallet.address}
+          onClose={() => setShowRecover(false)}
+          onDone={() => setShowRecover(false)}
+        />
+      )}
+      {showChangePassword && token && (
+        <ChangeWalletPasswordModal
+          token={token}
+          walletId={id}
+          onClose={() => setShowChangePassword(false)}
+          onDone={() => setShowChangePassword(false)}
         />
       )}
   </>

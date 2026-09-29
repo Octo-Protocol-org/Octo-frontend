@@ -65,3 +65,12 @@ export function getAccountExists(token: string, walletId: string, account: strin
   );
 }
 
+/** Upload (or replace) the encrypted backup blob stored server-side for a wallet. */
+export function uploadBackup(token: string, walletId: string, encryptedBackup: string) {
+  return apiFetch<{ stored: boolean }>(path`/v1/wallets/${walletId}/backup`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ encrypted_backup: encryptedBackup }),
+  });
+}
+
