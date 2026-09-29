@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { CopyButton } from "@/components/CopyButton";
 import { AddressQrCode } from "@/components/qr/AddressQrCode";
@@ -35,6 +35,9 @@ const MIN_LOADING_MS = 700;
 /** Stop auto-polling after this long when the API doesn't tell us when the intent expires. */
 const MAX_POLL_MS = 30 * 60_000;
 
+/** Warn the payer once this much time is left before the intent expires. */
+const EXPIRY_WARNING_MS = 2 * 60_000;
+
 // Status poll interval, backing off 3s → 5s → 10s the longer the payer waits.
 function pollDelayMs(elapsedMs: number) {
   if (elapsedMs < 60_000) return 3_000;
@@ -45,6 +48,16 @@ function pollDelayMs(elapsedMs: number) {
 // Identifies the payer inputs an intent was created from, so edits force a fresh intent.
 function intentInputsKey(amountUsdcStroops: number, name: string, email: string) {
   return JSON.stringify([amountUsdcStroops, name, email.toLowerCase()]);
+}
+
+// Formats a millisecond countdown as m:ss (or h:mm:ss past an hour) for the payer.
+function formatCountdown(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
 function celebrate() {
@@ -99,6 +112,8 @@ export default function PayPage({
   const confirmedRef = useRef(false);
   // Network passphrase received from signing-info; used to resolve the correct USDC issuer.
   const [networkPassphrase, setNetworkPassphrase] = useState<string>("");
+  // Ticking clock driving the expiry countdown; null until an intent with an expiry exists.
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -128,6 +143,8 @@ export default function PayPage({
     setResolvedStatus(null);
     setPollStopped(false);
     setCheckMessage(null);
+    // Restart the countdown clock for the new intent (or clear it when there is none).
+    setNow(next?.expires_at ? Date.now() : null);
   }
 
   // The single path for every confirmation source (poll, check-now, Freighter).
@@ -154,6 +171,19 @@ export default function PayPage({
     }
     return false;
   }
+
+  // Expiry is derived from the intent's expires_at so the UI can't drift from the backend.
+  const expiresAtMs = intent?.expires_at ? Date.parse(intent.expires_at) : NaN;
+  const hasExpiry = Number.isFinite(expiresAtMs);
+  const remainingMs = hasExpiry && now !== null ? expiresAtMs - now : null;
+  const isExpired = remainingMs !== null && remainingMs <= 0;
+
+  // Ticks once a second while a countdown is active; stops itself once the intent is gone.
+  useEffect(() => {
+    if (!hasExpiry || now === null || isExpired) return;
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, [hasExpiry, now === null, isExpired]);
 
   // Polls for confirmation with backoff; pauses while hidden or a Freighter submit is in flight.
   useEffect(() => {
@@ -228,6 +258,17 @@ export default function PayPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent, step, slug, link, resolvedStatus, pollStopped, freighterBusy]);
 
+  // Flips the UI to the expired state the moment the countdown hits zero.
+  useEffect(() => {
+    if (!intent || step !== "pay" || resolvedStatus || !isExpired) return;
+    setResolvedStatus({
+      status: "expired",
+      transaction_id: null,
+      expected_usdc_stroops: intent.amount_usdc_stroops,
+      received_usdc_stroops: null,
+    });
+  }, [intent, step, resolvedStatus, isExpired]);
+
   async function handleCheckPayment() {
     if (!intent) return;
     const paymentId = intent.payment_id;
@@ -294,6 +335,8 @@ export default function PayPage({
 
   async function handleFreighterPay() {
     if (!intent) return;
+    // Never start a wallet flow against an intent that has already expired.
+    if (isExpired) return;
     setFreighterBusy(true);
     setError(null);
     try {
@@ -492,6 +535,20 @@ export default function PayPage({
                 </button>
               </div>
 
+              {remainingMs !== null && (
+                <div
+                  className={`rounded-lg border px-3 py-2 text-xs ${
+                    remainingMs <= EXPIRY_WARNING_MS
+                      ? "border-amber-300 bg-amber-50 text-amber-700"
+                      : "border-gray-200 bg-gray-50 text-gray-600"
+                  }`}
+                >
+                  {remainingMs <= EXPIRY_WARNING_MS
+                    ? `⚠️ Less than ${formatCountdown(remainingMs)} left — complete your payment now or it will expire.`
+                    : `⏳ Time remaining to pay: ${formatCountdown(remainingMs)}`}
+                </div>
+              )}
+
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="text-xs text-gray-500">Amount</p>
                 <p className="mt-1 text-sm font-medium text-gray-900">
@@ -499,6 +556,8 @@ export default function PayPage({
                 </p>
               </div>
 
+              {/* Deposit address and QR are hidden once expired so nothing can be sent to a dead intent. */}
+              {!isExpired && (
               <div>
                 <p className="text-sm font-medium text-gray-900">Wallet Transfer</p>
                 <p className="mt-1 text-[11px] text-gray-500">
@@ -540,13 +599,17 @@ export default function PayPage({
                   <p className="mt-2 text-[11px] text-gray-500">{checkMessage}</p>
                 )}
               </div>
+              )}
 
+              {!isExpired && (
               <div className="flex items-center gap-3 text-[11px] text-gray-400">
                 <div className="h-px flex-1 bg-gray-200" />
                 OR
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
+              )}
 
+              {!isExpired && (
               <div>
                 <p className="text-sm font-medium text-gray-900">Connect Wallet</p>
                 <button
@@ -559,6 +622,7 @@ export default function PayPage({
                   {freighterBusy ? "Connecting…" : "🦄 Connect Freighter"}
                 </button>
               </div>
+              )}
 
               {error && <ErrorBanner message={error} />}
 

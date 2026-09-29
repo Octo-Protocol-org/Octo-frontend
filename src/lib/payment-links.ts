@@ -145,6 +145,8 @@ export type PaymentIntent = {
   amount_usdc_stroops: number;
   /** ISO timestamp after which the intent can no longer be paid, when the API provides it. */
   expires_at?: string | null;
+  /** ISO timestamp after which the intent can no longer be paid, when the API provides it. */
+  expires_at?: string | null;
 };
 
 export function createPaymentIntent(
