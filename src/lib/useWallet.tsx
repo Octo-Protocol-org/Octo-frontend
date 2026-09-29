@@ -24,40 +24,44 @@ export function WalletProvider({ walletId, children }: { walletId: string; child
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     if (!token) {
       return;
     }
 
     setLoading(true);
     setError(null);
-    getWallet(token, walletId)
+    getWallet(token, walletId, { signal: controller.signal })
       .then((value) => {
-        if (!cancelled) setWallet(value);
+        setWallet(value);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) {
-          setWallet(null);
-          setError(cause instanceof Error ? cause : new Error("Could not load wallet."));
-        }
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setWallet(null);
+        setError(cause instanceof Error ? cause : new Error("Could not load wallet."));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [token, walletId, reloadKey]);
+
+  // Treat 404 (unknown) and 403 (foreign) both as "not found" so the UI doesn't expose whether
+  // the wallet exists at all — prevents enumeration of other users' wallet IDs.
+  const isNotFoundStatus =
+    error instanceof ApiError && (error.status === 404 || error.status === 403);
 
   const value = useMemo<WalletContextValue>(() => ({
     wallet,
     loading,
-    error,
-    notFound: !loading && wallet === null && (error === null || (error instanceof ApiError && error.status === 404)),
+    error: isNotFoundStatus ? null : error,
+    notFound: !loading && wallet === null && (error === null || isNotFoundStatus),
     refresh: () => setReloadKey((key) => key + 1),
     update: setWallet,
-  }), [wallet, loading, error]);
+  }), [wallet, loading, error, isNotFoundStatus]);
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }

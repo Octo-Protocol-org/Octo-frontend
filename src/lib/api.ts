@@ -8,6 +8,9 @@
 export const API_URL =
   process.env.NEXT_PUBLIC_OCTO_API_URL ?? "http://localhost:8080";
 
+/** Default request timeout; callers may override via AbortSignal. */
+const DEFAULT_TIMEOUT_MS = 20_000;
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -40,24 +43,48 @@ export function path(
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit & { token?: string } = {},
+  options: RequestInit & { token?: string; signal?: AbortSignal } = {},
 ): Promise<T> {
-  const { token, headers, ...rest } = options;
+  const { token, signal: callerSignal, headers, ...rest } = options;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    headers: {
-      "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  // Combine caller signal with a hard timeout so hung connections don't spin forever.
+  const timeoutSignal = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, timeoutSignal])
+    : timeoutSignal;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...rest,
+      signal,
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+    });
+  } catch (err) {
+    // Map timeout/abort to a clear user-facing message.
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new ApiError("Request timed out. Check your connection and try again.", 0);
+    }
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw err; // Let callers handle intentional cancellations.
+    }
+    throw err;
+  }
+
+  // 204 No Content — no body to parse; resolve with undefined.
+  if (res.status === 204) {
+    return undefined as T;
+  }
 
   let body: Envelope<T> | null = null;
   try {
     body = (await res.json()) as Envelope<T>;
   } catch {
-    // non-JSON response
+    // Non-JSON response body.
   }
 
   if (!res.ok) {
@@ -77,5 +104,14 @@ export async function apiFetch<T>(
         : body?.message ?? `Request failed (${res.status})`;
     throw new ApiError(message, res.status);
   }
-  return body!.data;
+
+  // Unexpected non-JSON body on a successful response.
+  if (body === null) {
+    throw new ApiError(
+      `Unexpected response from server (status ${res.status}, no JSON body).`,
+      res.status,
+    );
+  }
+
+  return body.data;
 }

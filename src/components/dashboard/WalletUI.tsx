@@ -75,3 +75,30 @@ export function Panel({
 export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="py-6 text-center text-sm text-muted">{children}</p>;
 }
+
+/** Inline error banner with an optional Retry button for initial-load failures. */
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex items-center justify-between gap-4 rounded-xl border border-danger-border bg-danger-bg px-4 py-3 text-sm text-danger"
+    >
+      <span>{message}</span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="shrink-0 rounded-lg border border-danger-border px-3 py-1 text-xs font-medium hover:bg-danger-border/20"
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}

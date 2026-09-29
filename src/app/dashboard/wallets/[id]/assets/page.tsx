@@ -47,17 +47,20 @@ export default function AssetsPage({
 
   useEffect(() => {
     if (!token) return;
-    getBalances(token, id)
+    const controller = new AbortController();
+    getBalances(token, id, { signal: controller.signal })
       .then((b) => {
         setBalances(b);
         setError(null);
       })
       .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
         setBalances([]);
         // Without this the page shows "no assets", which looks like an empty wallet rather
         // than a failed request.
         setError(e instanceof Error ? e.message : "Could not load balances.");
       });
+    return () => controller.abort();
   }, [token, id]);
 
   if (loading || !user) {

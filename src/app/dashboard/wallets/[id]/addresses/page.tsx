@@ -55,15 +55,18 @@ export default function AddressesPage({
 
   useEffect(() => {
     if (!token) return;
-    listRecentAddresses(token, id)
+    const controller = new AbortController();
+    listAddresses(token, id, { signal: controller.signal })
       .then((a) => {
         setAddresses(a);
         setError(null);
       })
       .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
         setAddresses([]);
         setError(e instanceof Error ? e.message : "Could not load addresses.");
       });
+    return () => controller.abort();
   }, [token, id]);
 
   async function handleNewAddress(customerRef?: string) {
