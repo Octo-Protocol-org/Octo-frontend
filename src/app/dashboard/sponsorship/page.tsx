@@ -34,7 +34,7 @@ export default function SponsorshipPage() {
             getSponsorshipConfig(asAuthToken(token), asWalletId(w.id)).catch(() => null),
           ),
         );
-        return wallets.map((wallet, i) => ({ wallet, config: configs[i] }));
+        return wallets.map((wallet, i) => ({ wallet, config: configs[i] ?? null }));
       })
       .then(setRows)
       .catch((e) => {

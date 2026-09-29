@@ -23,6 +23,7 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>) {
       }
       const first = list[0];
       const last = list[list.length - 1];
+      if (!first || !last) return;
       const active = document.activeElement;
       if (e.shiftKey && (active === first || !root!.contains(active))) {
         e.preventDefault();

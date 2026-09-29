@@ -76,7 +76,7 @@ export default function PaymentLinksPage({
   );
 
   function refresh() {
-    load(cursors[pageIndex]);
+    load(cursors[pageIndex] ?? null);
   }
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function PaymentLinksPage({
     if (pageIndex === 0) return;
     const target = cursors[pageIndex - 1];
     setPageIndex((i) => i - 1);
-    load(target);
+    load(target ?? null);
   }
 
   async function handleToggleActive(link: PaymentLink) {

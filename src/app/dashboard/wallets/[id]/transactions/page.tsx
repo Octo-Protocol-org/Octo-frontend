@@ -70,7 +70,7 @@ export default function TransactionsPage({
   );
 
   function refresh() {
-    load(cursors[pageIndex]);
+    load(cursors[pageIndex] ?? null);
   }
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function TransactionsPage({
     if (pageIndex === 0) return;
     const target = cursors[pageIndex - 1];
     setPageIndex((i) => i - 1);
-    load(target);
+    load(target ?? null);
   }
 
   // Tabs are per-asset (not per-status or per-op-type, which don't exist on Stellar the way

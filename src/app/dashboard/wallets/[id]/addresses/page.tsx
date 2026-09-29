@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
+  listAddresses,
   listRecentAddresses,
   createAddress,
   type Address,

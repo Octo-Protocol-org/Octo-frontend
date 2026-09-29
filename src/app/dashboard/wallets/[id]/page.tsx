@@ -9,7 +9,8 @@ import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
   getBalances,
-  listRecentAddresses,
+  listAddresses,
+  listTransactions,
   listRecentTransactions,
   createAddress,
   usdcForNetwork,

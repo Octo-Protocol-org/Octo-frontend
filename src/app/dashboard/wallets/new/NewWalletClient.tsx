@@ -456,7 +456,8 @@ function pickWordIndices(total: number, count: number): number[] {
   const buf = new Uint32Array(1);
   while (picked.size < Math.min(count, total)) {
     crypto.getRandomValues(buf);
-    picked.add(buf[0] % total);
+    const random = buf[0];
+    if (random !== undefined) picked.add(random % total);
   }
   return [...picked].sort((a, b) => a - b);
 }
@@ -481,13 +482,14 @@ function PhraseCheck({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const mismatched = indices.filter(
-      (i) => (answers[i] ?? "").trim().toLowerCase() !== words[i],
+      (i) => (answers[i] ?? "").trim().toLowerCase() !== (words[i] ?? ""),
     );
     setWrong(mismatched);
     if (mismatched.length === 0) {
       onVerified();
     } else {
-      document.getElementById(`phrase-word-${mismatched[0]}`)?.focus();
+      const firstMismatch = mismatched[0];
+      if (firstMismatch !== undefined) document.getElementById(`phrase-word-${firstMismatch}`)?.focus();
     }
   }
 
@@ -548,7 +550,7 @@ function PhraseCheck({
           className="mt-4 rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright"
         >
           {wrong.length === 1
-            ? `Word #${wrong[0] + 1} doesn't match.`
+            ? `Word #${(wrong[0] ?? 0) + 1} doesn't match.`
             : `Words ${wrong.map((i) => `#${i + 1}`).join(", ")} don't match.`}{" "}
           Check what you wrote down, or view the phrase again.
         </p>

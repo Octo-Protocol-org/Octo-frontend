@@ -68,7 +68,7 @@ export async function updateUsername(token: string, username: string): Promise<U
 /** What to show for a user when no full profile page makes sense — falls back to the email
  * handle until they set a username. */
 export function displayName(user: Pick<User, "email" | "username">): string {
-  return user.username ?? user.email.split("@")[0];
+  return user.username ?? user.email.split("@")[0] ?? user.email;
 }
 
 // --- token storage (localStorage; bearer-token auth, not cookies) ---
