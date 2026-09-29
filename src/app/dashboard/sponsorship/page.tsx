@@ -11,7 +11,7 @@ import {
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
-import { formatStroops } from "@/lib/amount";
+import { SponsorshipSummary } from "@/components/sponsorship/SponsorshipSummary";
 
 type WalletSponsorship = {
   wallet: WalletView;
@@ -100,7 +100,7 @@ export default function SponsorshipPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {rows.map(({ wallet, config }) => (
               <WalletCard key={wallet.id} wallet={wallet} config={config} />
-            ))}
+            ))
           </div>
         )}
       </div>
@@ -137,24 +137,7 @@ function WalletCard({
         </span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <dt className="text-[11px] text-muted">Max fee / tx</dt>
-          <dd className="mt-0.5 text-foreground">
-            {config?.per_tx_fee_cap_stroops != null
-              ? `${formatStroops(config.per_tx_fee_cap_stroops, 2)} XLM`
-              : "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[11px] text-muted">Daily budget</dt>
-          <dd className="mt-0.5 text-foreground">
-            {config?.daily_budget_stroops != null
-              ? `${formatStroops(config.daily_budget_stroops, 2)} XLM`
-              : "—"}
-          </dd>
-        </div>
-      </dl>
+      <SponsorshipSummary config={config} className="mt-4" />
 
       <Link
         href={`/dashboard/wallets/${wallet.id}/sponsorship`}
