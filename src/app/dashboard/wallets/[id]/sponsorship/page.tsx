@@ -14,6 +14,7 @@ import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTran
 import { ApiError } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { formatStroops } from "@/lib/amount";
+import { BudgetMeter } from "@/components/dashboard/BudgetMeter";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function SponsorshipSettingsPage({
@@ -141,24 +142,12 @@ export default function SponsorshipSettingsPage({
               </div>
 
               {/* Today's spend */}
-              <section className="rounded-2xl border border-border bg-burgundy-soft/30 p-5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted">Today&apos;s spend</span>
-                  <span className="text-foreground">
-                    {formatStroops(spentToday)} XLM spent of{" "}
-                    {formatStroops(budgetStroops)} XLM daily budget
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-hover">
-                  <div
-                    className="h-full rounded-full bg-burgundy-bright"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted">
-                  {formatStroops(remaining)} XLM remaining today
-                </p>
-              </section>
+              <BudgetMeter
+                spentStroops={spentToday}
+                budgetStroops={budgetStroops}
+                remainingStroops={remaining}
+                pct={pct}
+              />
 
               {/* Settings form */}
               <section className="space-y-5 rounded-2xl border border-border bg-burgundy-soft/30 p-5">

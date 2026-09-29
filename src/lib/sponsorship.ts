@@ -6,6 +6,11 @@ import { apiFetch, path } from "./api";
 import { formatStroops } from "./amount";
 import { pageQuery, type PageOpts, type Paginated } from "./pagination";
 
+/** Shared formatter for stroop values, used by both sponsorship pages. */
+export function formatStroopsValue(stroops: number): string {
+  return formatStroops(stroops);
+}
+
 import type { AuthToken, WalletId } from "./brands";
 
 export type { AuthToken, WalletId };
@@ -77,5 +82,5 @@ export function listSponsoredTransactions(
  * Stellar fees are tiny (base fee 100 stroops = 0.00001 XLM), so rounding to 2 dp hid them.
  */
 export function stroopsToXlm(stroops: number): string {
-  return `${formatStroops(stroops)} XLM`;
+  return `${formatStroopsValue(stroops)} XLM`;
 }
