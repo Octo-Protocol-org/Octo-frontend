@@ -48,7 +48,7 @@ export default function DashboardHome() {
           const map = new Map<string, SponsorshipConfig | null>();
           page.data.forEach((w, i) => {
             const r = results[i];
-            map.set(w.id, r.status === "fulfilled" ? r.value : null);
+            map.set(w.id, r?.status === "fulfilled" ? r.value : null);
           });
           setSponsorshipByWalletId(map);
         })

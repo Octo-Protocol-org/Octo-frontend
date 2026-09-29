@@ -24,7 +24,7 @@ export function PayWithOctoSnippet({ url }: { url: string }) {
           style={Object.fromEntries(
             BUTTON_STYLE.split(";").map((d) => {
               const [k, v] = d.split(":");
-              return [k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), v];
+              return [(k ?? "").replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), v ?? ""];
             }),
           )}
         >

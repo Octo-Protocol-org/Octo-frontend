@@ -43,13 +43,14 @@ const CONFIGS: Record<string, NetworkConfig> = {
   },
 };
 
-if (!(raw in CONFIGS)) {
+const config = CONFIGS[raw];
+if (!config) {
   throw new Error(
     `Unknown NEXT_PUBLIC_STELLAR_NETWORK value "${raw}". Must be "testnet" or "mainnet".`,
   );
 }
 
-export const network: NetworkConfig = CONFIGS[raw];
+export const network: NetworkConfig = config;
 
 /** Returns the stellar.expert URL for a transaction hash. */
 export function explorerTxUrl(hash: string): string {
