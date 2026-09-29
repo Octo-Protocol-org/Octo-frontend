@@ -5,6 +5,7 @@
 import { apiFetch, path } from "./api";
 import { parseAmount, toApiStroops } from "./amount";
 import { pageQuery, type Paginated, type PageOpts } from "./pagination";
+import { network } from "./network";
 
 export type { Paginated, PageOpts } from "./pagination";
 
@@ -145,12 +146,14 @@ export function getBalances(token: string, id: string) {
   return apiFetch<Balance[]>(path`/v1/wallets/${id}/balances`, { token });
 }
 
-export async function listAddresses(
+/** First page of addresses up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentAddresses(
   token: string,
   id: string,
+  limit = 20,
 ): Promise<Address[]> {
   const page = await apiFetch<Paginated<Address>>(
-    path`/v1/wallets/${id}/addresses`,
+    path`/v1/wallets/${id}/addresses` + pageQuery({ limit }),
     { token },
   );
   return page.data;
@@ -168,21 +171,22 @@ export function createAddress(
   });
 }
 
-export async function listTransactions(
+/** First page of transactions up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentTransactions(
   token: string,
   id: string,
+  limit = 20,
 ): Promise<Transaction[]> {
   const page = await apiFetch<Paginated<Transaction>>(
-    path`/v1/wallets/${id}/transactions`,
+    path`/v1/wallets/${id}/transactions` + pageQuery({ limit }),
     { token },
   );
   return page.data;
 }
 
 /**
- * Paginated transactions. Unlike `listTransactions`, this keeps `next_cursor` so the caller can
- * page forward — the backend has always supported cursors, the UI just discarded them and
- * silently showed only the first page.
+ * Cursor-paginated transactions. Unlike `listRecentTransactions`, this keeps `next_cursor`
+ * so the caller can page forward.
  */
 export function listTransactionsPage(
   token: string,
@@ -221,17 +225,10 @@ export function amountToStroops(xlm: string): number | null {
 }
 
 /**
- * The most widely-used USDC issuer on the Stellar **testnet** (~45k trustlines) —
- * the one testnet faucets/tutorials mint against. auth_required=false, so a
- * trustline just works (it is auth_revocable, which is harmless on testnet).
- * Testnet has no single "canonical" Circle USDC the way mainnet does.
- * (Mainnet USDC is GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN —
- * wire this up per-network when mainnet lands.)
+ * Active network's USDC asset (code + issuer), sourced from the network config module.
+ * @deprecated Import `network.usdc` from `@/lib/network` directly in new code.
  */
-export const USDC_TESTNET = {
-  code: "USDC",
-  issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-} as const;
+export const USDC_TESTNET = network.usdc as { code: string; issuer: string };
 
 // Withdrawals and trustlines are now built + signed CLIENT-SIDE via `@/lib/sdk` and relayed
 // through `submitSigned` — the server holds no key to sign them. The old custodial
