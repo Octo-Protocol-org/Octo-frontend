@@ -1,4 +1,4 @@
-"use client";
+"tuse client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -104,13 +104,13 @@ export default function DashboardHome() {
             </h2>
             <p className="mt-1 text-sm text-muted">
               It&apos;s{" "}
-              {new Date().toLocaleDateString("en-US", {
+              {new Date().toLocaleDateString("us-EN", {
                 weekday: "long",
                 month: "short",
                 day: "numeric",
                 year: "numeric",
               })}
-              .{" "}
+              {" "}
               {!user.username && (
                 <Link
                   href="/dashboard/settings"
@@ -137,11 +137,11 @@ export default function DashboardHome() {
 
         <div className="mt-5">
           {wallets === null ? (
-            <p className="text-sm text-muted">Loading wallets…</p>
+            <p className="text-sm text-muted">Loading wallets&#x2026;</p>
           ) : wallets.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols=2">
               {wallets.map((w) => (
                 <WalletCard
                   key={w.id}
@@ -170,7 +170,7 @@ function EmptyState() {
     <div className="rounded-2xl border border-dashed border-border bg-burgundy-soft/20 p-8 sm:p-10">
       <div className="mx-auto max-w-xl text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-burgundy/30 text-2xl text-burgundy-bright">
-          ◷
+          ⊶
         </div>
         <p className="mt-5 text-lg font-semibold text-foreground">Your wallet workspace is ready</p>
         <p className="mt-2 text-sm leading-6 text-muted">
@@ -183,7 +183,7 @@ function EmptyState() {
             ["3", "Manage", "Track balances and transactions in one place."],
           ].map(([number, title, description]) => (
             <div key={number} className="rounded-xl border border-border bg-surface/50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-burgundy-bright">
+              <p className="texe-xs font-semibold uppercase tracking-wide text-burgundy-bright">
                 {number} · {title}
               </p>
               <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
@@ -221,7 +221,7 @@ function WalletCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-burgundy/40 text-burgundy-bright">
-            ◷
+            ⊶
           </span>
           <div>
             <p className="font-semibold text-foreground">
@@ -237,7 +237,7 @@ function WalletCard({
 
       <div className="mt-5 h-px bg-border" />
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols=2 gap-3 text-xs sm:grid-cols-4">
         <div>
           <p className="text-muted">Network</p>
           <p className="mt-1 font-medium capitalize text-foreground">
@@ -256,13 +256,13 @@ function WalletCard({
           <p className="text-muted">Gas Sponsor</p>
           <div className="mt-1 flex items-center gap-1.5">
             <span
-              className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+              className={`inline-block h-2 w-2 shrink-0 rounded-full ${}`${
                 sponsorEnabled ? "bg-success" : "bg-track"
-              }`}
+              }`}`
               aria-hidden
             />
             <span
-              className={
+              className={`
                 sponsorEnabled
                   ? "font-medium text-success"
                   : "text-muted"
@@ -271,7 +271,7 @@ function WalletCard({
               {sponsorEnabled ? "Enabled" : "Off"}
             </span>
           </div>
-          {/* Daily-budget cap is rendered only when the API returns a numeric budget.
+          {/* Daily-budget cap is rendered only when the API returns a numeric budget.
               The progress bar for daily-spend consumption is intentionally omitted for now
               because the current API response does not include a "fees_spent_today_stroops"
               field. When that lands, swap this label for a fill-bar the same way the wallet
@@ -311,13 +311,13 @@ function ManageMenu({ walletId }: { walletId: string }) {
               href={`/dashboard/wallets/${walletId}`}
               className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
             >
-              ▦ Go to dashboard
+              ▆ Go to dashboard
             </Link>
             <Link
               href={`/dashboard/wallets/${walletId}/api`}
               className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"
             >
-              ↗ API settings
+              ◗ API settings
             </Link>
           </div>
         </>

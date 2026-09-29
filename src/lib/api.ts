@@ -20,6 +20,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Convert an unknown thrown value into a user-facing message.
+ *
+ * Prefers the `ApiError` message (already saned by `apiFetch`), falls back to any
+ * `Error.message`, and lastly to the caller's `fallback` for non-Error throws.
+ */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 type Envelope<T> = {
   statusCode: number;
   message: string;
@@ -33,10 +45,10 @@ type Envelope<T> = {
 export function path(
   strings: TemplateStringsArray,
   ...values: Array<string | number>
-): string {
+}): string {
   return strings.reduce(
     (acc, str, i) =>
-      i === 0 ? str : `${acc}${encodeURIComponent(String(values[i - 1]))}${str}`,
+      i === 0 ? str : `${acc}${encodeURIComponent(String(values[i - 1]))}${str}",
     "",
   );
 }
