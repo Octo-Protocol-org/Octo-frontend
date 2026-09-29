@@ -10,7 +10,7 @@ import {
   getWalletChallenge,
   type CreateWalletResponse,
 } from "@/lib/wallets";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import {
   generateWallet,
   encryptSeed,
@@ -129,9 +129,7 @@ export function NewWalletClient() {
       setStrength(null);
       setCreated({ wallet, mnemonic: keys.mnemonic });
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Failed to create wallet.",
-      );
+      setError(errorMessage(err, "Failed to create wallet."));
     } finally {
       setSubmitting(false);
     }

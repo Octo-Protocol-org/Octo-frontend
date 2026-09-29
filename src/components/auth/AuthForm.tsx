@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { signup, login, verifyEmail, resendOtp, needsVerification, saveToken } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { OtpInput } from "./OtpInput";
 
 type Mode = "signup" | "login";
@@ -76,8 +76,7 @@ export function AuthForm({
         finish(result.token);
       }
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : "Something went wrong. Please try again.";
+      const message = errorMessage(err, "Something went wrong. Please try again.");
       setError(message);
       toast.error(message);
     } finally {
@@ -97,7 +96,7 @@ export function AuthForm({
       const result = await verifyEmail(userId, code);
       finish(result.token);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Invalid or expired code.";
+      const message = errorMessage(err, "Invalid or expired code.");
       setError(message);
       toast.error(message);
       setLoading(false);
@@ -112,7 +111,7 @@ export function AuthForm({
       startCooldown();
       toast.success("A new code is on its way.");
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Could not resend the code.";
+      const message = errorMessage(err, "Could not resend the code.");
       setError(message);
       toast.error(message);
     }

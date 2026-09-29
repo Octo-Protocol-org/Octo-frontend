@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
 import { updateUsername, type User } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
@@ -40,9 +40,7 @@ export default function SettingsPage() {
       setDraft(null);
       toast.success("Username saved.");
     } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to save username.",
-      );
+      toast.error(errorMessage(err, "Failed to save username."));
     } finally {
       setSubmitting(false);
     }
@@ -65,7 +63,7 @@ export default function SettingsPage() {
               Username
             </label>
             <p className="mt-1 text-xs text-muted">
-              3–20 characters: letters, numbers, underscores, and hyphens only.
+              3–30 characters: letters, numbers, underscores, and hyphens only.
             </p>
             <input
               value={username}

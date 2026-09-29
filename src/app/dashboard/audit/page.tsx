@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { listAuditLogsPage, type AuditLog } from "@/lib/audit";
+import { errorMessage } from "@/lib/api";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
@@ -34,17 +35,22 @@ export default function AuditLogsPage() {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const [pageIndex, setPageIndex] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
     (before: string | null) => {
       if (!token) return;
       setLogs(null);
+      setError(null);
       listAuditLogsPage(token, { category, search, before })
         .then((page) => {
           setLogs(page.data);
           setNextCursor(page.next_cursor);
         })
-        .catch(() => setLogs([]));
+        .catch((err) => {
+          setError(errorMessage(err, "Failed to load audit logs."));
+          setLogs([]);
+        });
     },
     [token, category, search],
   );
@@ -104,6 +110,12 @@ export default function AuditLogsPage() {
             ))}
           </select>
         </div>
+
+        {error && (
+          <p className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-burgundy-bright">
+            {error}
+          </p>
+        )}
 
         {/* table */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-border">

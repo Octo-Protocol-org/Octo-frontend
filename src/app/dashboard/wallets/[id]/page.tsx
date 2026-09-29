@@ -7,6 +7,7 @@ import { RecoverWalletModal } from "@/components/wallets/RecoverWalletModal";
 import { ChangeWalletPasswordModal } from "@/components/wallets/ChangeWalletPasswordModal";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
+import { errorMessage } from "@/lib/api";
 import {
   getBalances,
   listAddresses,
@@ -73,7 +74,7 @@ export default function WalletOverview({
       getBalances(token, id, { signal: controller.signal }).then(setBalances).catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setBalances([]);
-        setLoadError(e instanceof Error ? e.message : "Could not load wallet data.");
+        setLoadError(errorMessage(e, "Could not load wallet data."));
       }),
       listAddresses(token, id, { signal: controller.signal }).then(setAddresses).catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
@@ -113,7 +114,7 @@ export default function WalletOverview({
       const addr = await createAddress(token, id, customerRef);
       setAddresses((a) => [addr, ...a]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not generate address.");
+      toast.error(errorMessage(e, "Could not generate address."));
     } finally {
       setCreating(false);
     }
@@ -158,7 +159,7 @@ export default function WalletOverview({
                 setLoadError(null);
                 if (token) {
                   Promise.all([
-                    getBalances(token, id).then(setBalances).catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load wallet data.")),
+                    getBalances(token, id).then(setBalances).catch((e) => setLoadError(errorMessage(e, "Could not load wallet data."))),
                     listAddresses(token, id).then(setAddresses).catch(() => {}),
                     listTransactions(token, id).then(setTxns).catch(() => {}),
                   ]).finally(() => setStatsLoading(false));
