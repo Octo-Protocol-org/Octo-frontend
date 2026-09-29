@@ -151,11 +151,11 @@ export default function PaymentLinksPage({
                 <Stat label="Total links" value={String(links.length)} />
                 <Stat label="Active links" value={String(activeCount)} />
                 <Stat
-                  label="Total collected"
+                  label="Total collected (this page)"
                   value={`$${formatStroops(totalCollected)}`}
                 />
                 <Stat
-                  label="Avg. payment"
+                  label="Avg. payment (this page)"
                   value={`$${formatStroops(avgPayment)}`}
                 />
               </div>

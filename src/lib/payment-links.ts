@@ -23,12 +23,14 @@ export type PaymentLink = {
   url: string;
 };
 
-export async function listPaymentLinks(
+/** First page of payment links up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentPaymentLinks(
   token: AuthToken,
   walletId: WalletId,
+  limit = 20,
 ): Promise<PaymentLink[]> {
   const page = await apiFetch<Paginated<PaymentLink>>(
-    `/v1/wallets/${walletId}/payment-links`,
+    `/v1/wallets/${walletId}/payment-links${pageQuery({ limit })}`,
     { token },
   );
   return page.data;

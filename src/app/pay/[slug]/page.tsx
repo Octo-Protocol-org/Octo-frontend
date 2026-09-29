@@ -18,6 +18,8 @@ import {
   type PaymentStatus,
 } from "@/lib/payment-links";
 import { usdcForNetwork } from "@/lib/networkConfig";
+import { USDC_TESTNET } from "@/lib/wallets";
+import { network, explorerTxUrl } from "@/lib/network";
 import { buildUnsignedPayment } from "@/lib/sdk";
 import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
@@ -349,9 +351,12 @@ export default function PayPage({
         <div className="flex flex-col justify-between bg-black p-8">
           <div className="flex items-center justify-between">
             <Logo />
-            <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400">
-              Testnet
-            </span>
+            {/* Badge is only shown on testnet — on mainnet payers must not see a "Testnet" label. */}
+            {network.isTestnet && (
+              <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400">
+                {network.displayName}
+              </span>
+            )}
           </div>
 
           {link && (

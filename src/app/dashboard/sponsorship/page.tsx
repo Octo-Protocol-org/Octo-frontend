@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
-import { listWallets, type WalletView } from "@/lib/wallets";
+import { listAllWallets, type WalletView } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
   type SponsorshipConfig,
@@ -24,7 +24,7 @@ export default function SponsorshipPage() {
 
   useEffect(() => {
     if (!token) return;
-    listWallets(token)
+    listAllWallets(token)
       .then(async (wallets) => {
         // Only the sponsorship config is fetched per wallet — not full wallet details.
         const configs = await Promise.all(

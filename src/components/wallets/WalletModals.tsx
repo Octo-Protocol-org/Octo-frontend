@@ -7,6 +7,7 @@ import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { DepositQrCodes } from "@/components/qr/DepositQrCodes";
 import { ApiError } from "@/lib/api";
 import { usdcForNetwork, type Address, type Balance } from "@/lib/wallets";
+import { explorerTxUrl } from "@/lib/network";
 import {
   unlockWallet, getSigningInfo, submitSigned, requestWithdrawOtp, confirmWithdraw,
   getAccountExists, buildSignedPayment, buildSignedChangeTrust, buildSignedCreateAccount,
@@ -96,7 +97,7 @@ export function TrustlineModal({
           </p>
           {result.hash && (
             <a
-              href={`https://stellar.expert/explorer/testnet/tx/${result.hash}`}
+              href={explorerTxUrl(result.hash)}
               target="_blank"
               rel="noopener noreferrer"
               title="View transaction on Stellar Explorer"
@@ -491,7 +492,7 @@ export function WithdrawModal({
           )}
           {result.stellar_tx_hash && (
             <a
-              href={`https://stellar.expert/explorer/testnet/tx/${result.stellar_tx_hash}`}
+              href={explorerTxUrl(result.stellar_tx_hash)}
               target="_blank"
               rel="noopener noreferrer"
               title="View transaction on Stellar Explorer"
