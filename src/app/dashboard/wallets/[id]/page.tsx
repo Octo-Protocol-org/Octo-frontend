@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { TrustlineModal, DepositModal, WithdrawModal } from "@/components/wallets/WalletModals";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
@@ -90,6 +91,8 @@ export default function WalletOverview({
     try {
       const addr = await createAddress(token, id, customerRef);
       setAddresses((a) => [addr, ...a]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate address.");
     } finally {
       setCreating(false);
     }

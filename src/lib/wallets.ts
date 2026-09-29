@@ -137,6 +137,26 @@ export async function listWallets(token: string): Promise<WalletView[]> {
   return page.data;
 }
 
+/** Cursor-paginated wallet list — use this when the caller needs to walk all pages. */
+export function listWalletsPage(
+  token: string,
+  opts?: PageOpts,
+): Promise<Paginated<WalletView>> {
+  return apiFetch<Paginated<WalletView>>("/v1/wallets" + pageQuery(opts), { token });
+}
+
+/** Fetch every wallet by walking all cursor pages. */
+export async function listAllWallets(token: string): Promise<WalletView[]> {
+  const all: WalletView[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await listWalletsPage(token, { before: cursor });
+    all.push(...page.data);
+    cursor = page.next_cursor;
+  } while (cursor);
+  return all;
+}
+
 export function getWallet(token: string, id: string) {
   return apiFetch<WalletView>(path`/v1/wallets/${id}`, { token });
 }
