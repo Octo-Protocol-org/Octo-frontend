@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
   getBalances,
-  USDC_TESTNET,
   type Balance,
 } from "@/lib/wallets";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
@@ -162,9 +161,7 @@ export default function AssetsPage({
             {credits.length === 0 && (
               <p className="text-xs text-muted">
                 Only XLM is held right now. This wallet can also hold credit assets like{" "}
-                <span className="font-mono text-foreground">
-                  {USDC_TESTNET.code}
-                </span>{" "}
+                <span className="font-mono text-foreground">USDC</span>{" "}
                 once a trustline is added from the wallet Overview page.
               </p>
             )}

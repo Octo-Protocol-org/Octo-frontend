@@ -28,7 +28,7 @@ export async function unlockWallet(
     const remote = await getBackup(token, walletId);
     if (!remote.encrypted_backup) {
       throw new Error(
-        "No key backup found for this wallet. Recover it with your recovery phrase.",
+        'No key backup found for this wallet. Use "Recover wallet" on the wallet overview page.',
       );
     }
     backup = parseBackup(remote.encrypted_backup);

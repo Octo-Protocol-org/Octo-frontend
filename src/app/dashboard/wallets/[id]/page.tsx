@@ -1,19 +1,24 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { TrustlineModal, DepositModal, WithdrawModal } from "@/components/wallets/WalletModals";
+import { RecoverWalletModal } from "@/components/wallets/RecoverWalletModal";
+import { ChangeWalletPasswordModal } from "@/components/wallets/ChangeWalletPasswordModal";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
   getBalances,
-  listAddresses,
-  listTransactions,
+  listRecentAddresses,
+  listRecentTransactions,
   createAddress,
-  USDC_TESTNET,
+  usdcForNetwork,
   type Balance,
   type Address,
   type Transaction,
 } from "@/lib/wallets";
+import { NETWORK_PASSPHRASE_TESTNET } from "@/lib/networkConfig";
+import { explorerTxUrl } from "@/lib/network";
 import { parseAmount, formatStroops } from "@/lib/amount";
 import {
   spendableNativeStroops,
@@ -50,13 +55,13 @@ export default function WalletOverview({
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showTrustline, setShowTrustline] = useState(false);
+  const [showRecover, setShowRecover] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   function refresh() {
     if (!token) return;
     getBalances(token, id).then(setBalances).catch(() => {});
-    // The submit-signed endpoint records the outbound transfer server-side before responding,
-    // so a plain re-fetch reflects it (no optimistic insert needed).
-    listTransactions(token, id).then(setTxns).catch(() => {});
+    listRecentTransactions(token, id).then(setTxns).catch(() => {});
   }
 
   useEffect(() => {
@@ -89,7 +94,7 @@ export default function WalletOverview({
       const controller = new AbortController();
       await Promise.all([
         getBalances(token, id, { signal: controller.signal }).then(setBalances).catch(() => {}),
-        listTransactions(token, id, { signal: controller.signal }).then(setTxns).catch(() => {}),
+        listRecentTransactions(token, id, { signal: controller.signal }).then(setTxns).catch(() => {}),
       ]);
     },
     [token, id],
@@ -106,6 +111,8 @@ export default function WalletOverview({
     try {
       const addr = await createAddress(token, id, customerRef);
       setAddresses((a) => [addr, ...a]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate address.");
     } finally {
       setCreating(false);
     }
@@ -119,8 +126,10 @@ export default function WalletOverview({
 
   const xlm = balances.find((b) => b.asset_type === "native");
   const xlmAmount = xlm ? xlm.balance : "0";
+  // Use testnet passphrase as the display default; the balance issuer check is exact.
+  const usdc = usdcForNetwork(NETWORK_PASSPHRASE_TESTNET);
   const usdcBalance = balances.find(
-    (b) => b.asset_code === USDC_TESTNET.code && b.asset_issuer === USDC_TESTNET.issuer,
+    (b) => b.asset_code === usdc.code && b.asset_issuer === usdc.issuer,
   );
   const hasUsdc = usdcBalance !== undefined;
   // Spendable XLM is derived client-side; show "—" until balances load to avoid fake zeros.
@@ -213,6 +222,8 @@ export default function WalletOverview({
                 label="Refresh balances"
                 onClick={() => token && getBalances(token, id).then(setBalances)}
               />
+              <ActionButton label="Recover wallet" onClick={() => setShowRecover(true)} />
+              <ActionButton label="Change wallet password" onClick={() => setShowChangePassword(true)} />
             </div>
 
             {token && <TrustlineDetails token={token} walletId={id} balances={balances} onChanged={refresh} />}
@@ -348,7 +359,7 @@ export default function WalletOverview({
                           <td className="py-3 font-mono text-xs">
                             {t.stellar_tx_hash ? (
                               <a
-                                href={`https://stellar.expert/explorer/testnet/tx/${t.stellar_tx_hash}`}
+                                href={explorerTxUrl(t.stellar_tx_hash)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="View transaction on Stellar Explorer"
@@ -415,6 +426,23 @@ export default function WalletOverview({
             setShowTrustline(false);
             refresh();
           }}
+        />
+      )}
+      {showRecover && token && wallet?.address && (
+        <RecoverWalletModal
+          token={token}
+          walletId={id}
+          walletAddress={wallet.address}
+          onClose={() => setShowRecover(false)}
+          onDone={() => setShowRecover(false)}
+        />
+      )}
+      {showChangePassword && token && (
+        <ChangeWalletPasswordModal
+          token={token}
+          walletId={id}
+          onClose={() => setShowChangePassword(false)}
+          onDone={() => setShowChangePassword(false)}
         />
       )}
   </>

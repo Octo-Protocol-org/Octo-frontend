@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
-  listAddresses,
+  listRecentAddresses,
   createAddress,
   type Address,
 } from "@/lib/wallets";
@@ -42,7 +42,7 @@ export default function AddressesPage({
   function refresh() {
     if (!token) return;
     setRefreshing(true);
-    listAddresses(token, id)
+    listRecentAddresses(token, id)
       .then((a) => {
         setAddresses(a);
         setError(null);

@@ -28,6 +28,7 @@ export {
   getSigningInfo,
   submitSigned,
   getBackup,
+  uploadBackup,
   requestWithdrawOtp,
   confirmWithdraw,
   getAccountExists,
