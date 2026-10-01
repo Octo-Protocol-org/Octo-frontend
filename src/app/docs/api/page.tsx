@@ -2,6 +2,7 @@ export const metadata = { title: "API Overview — Octo" };
 
 import Link from "next/link";
 import { Prose, Code } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function ApiOverview() {
   return (
@@ -12,8 +13,8 @@ export default function ApiOverview() {
       <h1 className="mt-2 text-4xl font-semibold text-foreground">Overview</h1>
 
       <p>
-        The Octo API is a JSON REST API. The base URL in local development is{" "}
-        <code>http://localhost:8080</code>.
+        The Octo API is a JSON REST API. The base URL is <code>{API_URL}</code>{" "}
+        (<code>http://localhost:8080</code> when running the backend locally).
       </p>
 
       <h2>Response envelope</h2>

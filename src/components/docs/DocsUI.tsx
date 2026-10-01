@@ -1,5 +1,7 @@
 /** Small presentational primitives for the docs pages (Blockradar-style). */
 
+import { CopyButton } from "@/components/CopyButton";
+
 export function Callout({
   type = "note",
   children,
@@ -30,11 +32,11 @@ export function Code({
 }) {
   return (
     <div className="my-5 overflow-hidden rounded-xl border border-border bg-code-bg">
-      {label && (
-        <div className="border-b border-border px-4 py-2 text-xs text-muted">
-          {label}
-        </div>
-      )}
+      {/* Header always renders so every block gets a copy button; copies the raw sample only. */}
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 text-xs text-muted">
+        <span>{label}</span>
+        <CopyButton value={children} label="Copy code" />
+      </div>
       <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-foreground/85">
         <code>{children}</code>
       </pre>

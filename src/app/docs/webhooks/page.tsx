@@ -1,6 +1,7 @@
 export const metadata = { title: "Webhooks — Octo" };
 
 import { Prose, Code, Callout, Endpoint } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function Webhooks() {
   return (
@@ -18,7 +19,7 @@ export default function Webhooks() {
 
       <h2>Register an endpoint</h2>
       <Endpoint method="POST" path="/v1/wallets/:id/webhooks" />
-      <Code label="Request">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/webhooks \\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/webhooks \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{ "url": "https://your.app/webhooks/octo" }'`}</Code>
