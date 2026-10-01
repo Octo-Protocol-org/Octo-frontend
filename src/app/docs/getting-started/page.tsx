@@ -2,6 +2,7 @@ export const metadata = { title: "Getting Started — Octo" };
 
 import Link from "next/link";
 import { Prose, Step, Code, Callout } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function GettingStarted() {
   return (
@@ -22,7 +23,8 @@ export default function GettingStarted() {
         <Callout type="note">
           <strong>What you&apos;ll need:</strong> an Octo account and your{" "}
           <strong>Wallet ID</strong> + <strong>API key</strong> (Step 2). The
-          base URL is <code>http://localhost:8080</code> in local development.
+          base URL is <code>{API_URL}</code> (<code>http://localhost:8080</code>{" "}
+          when running the backend locally).
         </Callout>
       </Prose>
 
@@ -38,7 +40,7 @@ export default function GettingStarted() {
             Prefer the API? Sign up and create a wallet with your login token:
           </p>
           <Code label="cURL">{`# create a master wallet (login-token auth)
-curl -X POST http://localhost:8080/v1/wallets \\
+curl -X POST ${API_URL}/v1/wallets \\
   -H "authorization: Bearer <LOGIN_TOKEN>" \\
   -H "content-type: application/json" \\
   -d '{"label":"Acme treasury"}'`}</Code>
@@ -51,7 +53,7 @@ curl -X POST http://localhost:8080/v1/wallets \\
             is shown <strong>once</strong> — copy it now. This key authorizes
             integration requests for this wallet.
           </p>
-          <Code label="cURL">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/api-key \\
+          <Code label="cURL">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/api-key \\
   -H "authorization: Bearer <LOGIN_TOKEN>"
 
 # → { "data": { "api_key": "octo_sk_test_ab12…", "prefix": "octo_sk_test_ab12" } }`}</Code>
@@ -63,7 +65,7 @@ curl -X POST http://localhost:8080/v1/wallets \\
             <code>customer_ref</code> and any <code>metadata</code> — both are
             echoed back to you in webhooks for reconciliation.
           </p>
-          <Code label="cURL">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/addresses \\
+          <Code label="cURL">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/addresses \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{ "customer_ref": "user_42", "metadata": { "plan": "pro" } }'`}</Code>
@@ -90,7 +92,7 @@ curl -X POST http://localhost:8080/v1/wallets \\
             Octo POSTs a signed <code>deposit.created</code> event to your URL,
             including the address <code>metadata</code>.
           </p>
-          <Code label="cURL — register endpoint">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/webhooks \\
+          <Code label="cURL — register endpoint">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/webhooks \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{ "url": "https://your.app/webhooks/octo" }'
@@ -121,7 +123,7 @@ X-Octo-Signature: <hmac-sha256 hex>
             withdrawals require a <strong>dashboard login token</strong>, not an
             API key. An <code>Idempotency-Key</code> makes retries safe.
           </p>
-          <Code label="cURL">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/withdraw \\
+          <Code label="cURL">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/withdraw \\
   -H "authorization: Bearer <LOGIN_TOKEN>" \\
   -H "Idempotency-Key: payout-9f3c" \\
   -H "content-type: application/json" \\

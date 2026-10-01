@@ -1,6 +1,7 @@
 export const metadata = { title: "Checkout — Octo" };
 
 import { Prose, Code, Endpoint, ParamTable, Callout } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function Checkout() {
   return (
@@ -50,7 +51,7 @@ export default function Checkout() {
           },
         ]}
       />
-      <Code label="Request">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/payment-links \\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/payment-links \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{
@@ -122,10 +123,21 @@ export default function Checkout() {
       </p>
       <Code label="Redirect">{`https://your-site.com/thank-you?status=success&payment_id=7c3e…&slug=ab12cd34ef`}</Code>
       <Callout type="warning">
-        This redirect is UX only. Always confirm a payment via the{" "}
-        <code>payment_link.paid</code> webhook, not the redirect query params — a
-        customer could reload or hand-craft the URL themselves.
+        <strong>Redirect parameters are untrusted.</strong> Anyone can type a URL
+        with <code>status=success</code>. Never fulfil an order from these
+        params alone; confirm the payment server-side using{" "}
+        <code>payment_id</code> first.
       </Callout>
+      <Code label="Server-side verification (Node)">{`// Re-check the payment server-side before fulfilling; never trust the URL.
+const res = await fetch(
+  \`${API_URL}/v1/pay/\${slug}/payments/\${paymentId}\`,
+);
+const { data } = await res.json();
+if (data.status !== "confirmed") throw new Error("Payment not confirmed");`}</Code>
+      <p>
+        The most reliable option is the <code>payment_link.paid</code> webhook;
+        see <a href="/docs/webhooks">Webhooks</a> for signature verification.
+      </p>
     </Prose>
   );
 }

@@ -1,6 +1,7 @@
 export const metadata = { title: "Withdrawals API — Octo" };
 
 import { Prose, Code, Endpoint, ParamTable, Callout } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function ApiWithdrawals() {
   return (
@@ -52,7 +53,7 @@ export default function ApiWithdrawals() {
           },
         ]}
       />
-      <Code label="Request">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/withdraw \\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/withdraw \\
   -H "authorization: Bearer <LOGIN_TOKEN>" \\
   -H "Idempotency-Key: payout-9f3c" \\
   -H "content-type: application/json" \\

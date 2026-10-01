@@ -1,6 +1,7 @@
 export const metadata = { title: "Authentication API — Octo" };
 
 import { Prose, Code, Callout } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function ApiAuth() {
   return (
@@ -46,7 +47,7 @@ export default function ApiAuth() {
         user owns.
       </p>
       <Code>{`# obtain a login token
-curl -X POST http://localhost:8080/v1/auth/login \\
+curl -X POST ${API_URL}/v1/auth/login \\
   -H "content-type: application/json" \\
   -d '{ "email": "you@acme.com", "password": "•••••••••" }'
 

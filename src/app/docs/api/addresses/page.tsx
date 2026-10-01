@@ -1,6 +1,7 @@
 export const metadata = { title: "Addresses API — Octo" };
 
 import { Prose, Code, Endpoint, ParamTable } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function ApiAddresses() {
   return (
@@ -32,7 +33,7 @@ export default function ApiAddresses() {
           },
         ]}
       />
-      <Code label="Request">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/addresses \\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/addresses \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{ "customer_ref": "user_42", "metadata": { "plan": "pro" } }'`}</Code>
@@ -51,7 +52,7 @@ export default function ApiAddresses() {
 
       <h2>List addresses</h2>
       <Endpoint method="GET" path="/v1/wallets/:id/addresses" />
-      <Code label="Request">{`curl http://localhost:8080/v1/wallets/<WALLET_ID>/addresses \\
+      <Code label="Request">{`curl ${API_URL}/v1/wallets/<WALLET_ID>/addresses \\
   -H "authorization: Bearer octo_sk_test_ab12…"`}</Code>
       <p>
         Returns an array of address objects (same shape as above), most recent
