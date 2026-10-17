@@ -2,6 +2,10 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { safeNextPath } from "@/lib/safeNext";
 
+// Force dynamic render so the strict nonce-based CSP (src/proxy.ts) can stamp its per-request
+// nonce onto this page's scripts — the login form handles credentials.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Log in — Octo" };
 
 export default async function LoginPage({

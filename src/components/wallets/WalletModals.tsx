@@ -217,9 +217,12 @@ const RESEND_COOLDOWN_SECS = 30;
 // Wall clock for event handlers; kept outside components so the purity lint can see it isn't render.
 const clockMs = () => Date.now();
 
-/** A withdrawable asset derived from the wallet's balances. */
+/** A withdrawable asset derived from the wallet's balances. Keyed by `code:issuer` so two
+ * assets sharing a code (different issuers) can be told apart and selected correctly. */
 type WithdrawAsset = {
+  key: string; // "XLM" for native, "CODE:ISSUER" for credit assets
   code: string; // display code, e.g. "XLM" or "USDC"
+  issuer?: string; // undefined => native XLM
   available: string;
   /** undefined => native XLM; otherwise the credit asset to send. */
   asset?: { code: string; issuer: string };
@@ -254,18 +257,25 @@ export function WithdrawModal({
   );
   const assets: WithdrawAsset[] = [
     {
+      key: "XLM",
       code: "XLM",
       available: balances.find((b) => b.asset_type === "native")?.balance ?? "0",
     },
-    ...trustlines.map((b) => ({
-      code: b.asset_code as string,
-      available: b.balance,
-      asset: { code: b.asset_code as string, issuer: b.asset_issuer as string },
-    })),
+    ...trustlines.map((b) => {
+      const code = b.asset_code as string;
+      const issuer = b.asset_issuer as string;
+      return {
+        key: `${code}:${issuer}`,
+        code,
+        issuer,
+        available: b.balance,
+        asset: { code, issuer },
+      };
+    }),
   ];
 
-  const defaultAsset: WithdrawAsset = { code: "XLM", available: "0" };
-  const [selectedCode, setSelectedCode] = useState((assets[0] ?? defaultAsset).code);
+  const defaultAsset: WithdrawAsset = { key: "XLM", code: "XLM", available: "0" };
+  const [selectedKey, setSelectedKey] = useState((assets[0] ?? defaultAsset).key);
   const [destination, setDestination] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
@@ -292,7 +302,7 @@ export function WithdrawModal({
   const resendCooldown = Math.max(0, Math.ceil((resendAvailableAt - now) / 1000));
 
   const selected =
-    assets.find((a) => a.code === selectedCode) ?? assets[0] ?? defaultAsset;
+    assets.find((a) => a.key === selectedKey) ?? assets[0] ?? defaultAsset;
 
   useEffect(() => {
     getSigningInfo(token, walletId).then(setReserveInfo).catch(() => {});
@@ -665,16 +675,26 @@ export function WithdrawModal({
           <div className="mt-1 flex flex-wrap gap-2">
             {assets.map((a) => (
               <button
-                key={a.code}
+                key={a.key}
                 type="button"
-                onClick={() => setSelectedCode(a.code)}
+                onClick={() => setSelectedKey(a.key)}
                 className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  a.code === selectedCode
+                  a.key === selectedKey
                     ? "border-burgundy-bright bg-burgundy/20 text-foreground"
                     : "border-border bg-surface-sunken text-muted hover:border-border-strong"
                 }`}
               >
-                {a.code}
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-medium text-foreground">{a.code}</span>
+                  {a.issuer && (
+                    <span
+                      className="text-[10px] text-muted truncate max-w-[14rem]"
+                      title={a.issuer}
+                    >
+                      {a.issuer}
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>

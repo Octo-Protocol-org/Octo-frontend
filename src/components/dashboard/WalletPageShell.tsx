@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
+import { IdleLock } from "@/components/dashboard/IdleLock";
 import { network } from "@/lib/network";
 
 type WalletPageShellProps = {
@@ -68,6 +69,8 @@ export function WalletPageShell({
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
       <DashboardBackground />
+      {/* idle auto-lock warning banner */}
+      <IdleLock onLogout={logout} />
       {/* Banner is only rendered on testnet — on mainnet this would mislead users. */}
       {network.isTestnet && (
         <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">

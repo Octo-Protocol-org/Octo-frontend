@@ -105,15 +105,29 @@ export default function TransactionsPage({
   }
 
   // Tabs are per-asset (not per-status or per-op-type, which don't exist on Stellar the way
-  // they do on an EVM chain): "All" plus one tab per distinct asset code this wallet has ever
-  // moved, so a wallet holding several trustlined assets can isolate one asset's history.
+  // they do on an EVM chain): "All" plus one tab per distinct `code:issuer` asset this wallet
+  // has ever moved, so a wallet holding several trustlined assets can isolate one asset's
+  // history even when two assets share a code.
+  function assetKey(tx: Transaction): string {
+    return tx.asset_issuer ? `${tx.asset_code}:${tx.asset_issuer}` : "XLM";
+  }
+
+  function assetLabel(key: string): string {
+    if (key === "all") return "All assets";
+    if (key === "XLM") return "XLM";
+    const [code, issuer] = key.split(":");
+    return `${code} (${issuer})`;
+  }
+
   const assetTabs = useMemo(() => {
-    const codes = new Set(txns.map((t) => t.asset_code));
-    return ["all", ...Array.from(codes).sort()];
+    const keys = new Set(txns.map(assetKey));
+    return ["all", ...Array.from(keys).sort()];
   }, [txns]);
 
   const filtered =
-    assetFilter === "all" ? txns : txns.filter((t) => t.asset_code === assetFilter);
+    assetFilter === "all"
+      ? txns
+      : txns.filter((t) => assetKey(t) === assetFilter);
 
   const totalDeposits = txns.filter((t) => t.direction === "deposit").length;
   const totalWithdrawals = txns.filter((t) => t.direction === "withdrawal").length;
@@ -172,17 +186,17 @@ export default function TransactionsPage({
             <div className="flex items-center justify-between">
               {/* asset filter tabs */}
               <div className="flex gap-1 rounded-lg border border-border bg-surface-raised p-1">
-                {assetTabs.map((code) => (
+                {assetTabs.map((key) => (
                   <button
-                    key={code}
-                    onClick={() => setAssetFilter(code)}
+                    key={key}
+                    onClick={() => setAssetFilter(key)}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                      assetFilter === code
+                      assetFilter === key
                         ? "bg-burgundy/30 text-burgundy-bright"
                         : "text-muted hover:text-foreground"
                     }`}
                   >
-                    {code === "all" ? "All assets" : displayAssetCode(code)}
+                    {assetLabel(key)}
                   </button>
                 ))}
               </div>

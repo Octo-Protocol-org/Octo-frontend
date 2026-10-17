@@ -67,21 +67,22 @@ export function proxy(request: NextRequest) {
   const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
   const img = `img-src 'self' blob: data: ${CLOUDINARY_CDN}`;
 
-  // The authenticated dashboard handles decrypted keys and the encrypted key backups in
-  // localStorage, so every /dashboard/* route gets a strict, nonce-based CSP with no
-  // `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each page's
-  // `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its scripts.
-  // The public checkout (/pay/*) builds transactions and talks to Freighter, so it is the most
-  // attacker-facing page and gets the same strict policy. Marketing/login/docs pages handle no
-  // keys and stay static, so they get a lighter CSP that does not require a nonce (a nonce would
-  // block their prerendered scripts).
+  // Routes that handle credentials or session state (password at login/signup/reset, decrypted
+  // keys in localStorage across the dashboard, and the payer's transaction details at checkout)
+  // get a strict, nonce-based CSP with no `unsafe-inline` on scripts — an XSS there could capture
+  // a password or tamper with a transaction before signing. They are forced to dynamic rendering
+  // (each page sets `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto
+  // its scripts. Purely static marketing/docs pages handle no credentials and stay on the lighter
+  // CSP that does not require a nonce (a nonce would block their prerendered scripts).
   const pathname = request.nextUrl.pathname;
-  // The strict CSP applies to the whole authenticated dashboard (overview, settings, audit,
-  // sponsorship, wallet creation/keygen and the per-wallet page with withdraw/trustline signing)
-  // and to the public checkout, where an XSS could tamper with the transaction or the payer's
-  // details before signing.
-  const isSigningSurface =
-    /^\/dashboard(\/|$)/.test(pathname) || /^\/pay(\/|$)/.test(pathname);
+  // Credential/session-handling routes: login/signup/reset, the whole authenticated dashboard,
+  // and the public checkout.
+  const isStrictRoute =
+    /^\/login(\/|$)/.test(pathname) ||
+    /^\/signup(\/|$)/.test(pathname) ||
+    /^\/forgot-password(\/|$)/.test(pathname) ||
+    /^\/dashboard(\/|$)/.test(pathname) ||
+    /^\/pay(\/|$)/.test(pathname);
 
   // Only add reporting directives when a valid endpoint is configured, so an unset or malformed
   // variable leaves the CSP and headers exactly as before.
@@ -93,7 +94,7 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   let csp: string;
 
-  if (isSigningSurface) {
+  if (isStrictRoute) {
     const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
     csp = [
       `default-src 'self'`,

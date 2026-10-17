@@ -182,3 +182,80 @@ describe('proxy inline theme script allowance', () => {
     expect(csp).not.toMatch(/'nonce-[^']+'/);
   });
 });
+
+describe('proxy CSP route classification', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env.CSP_REPORT_URI;
+    delete process.env.CSP_REPORT_TO;
+    delete process.env.NEXT_PUBLIC_CSP_REPORT_URI;
+    delete process.env.VERCEL_ENV;
+    delete (process.env as Record<string, string | undefined>).NODE_ENV;
+  });
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  function isStrict(csp: string): boolean {
+    const scriptSrc = getDirective(csp, 'script-src');
+    return scriptSrc !== null
+      ? scriptSrc.includes("'nonce-") && scriptSrc.includes("'strict-dynamic'") &&
+          !scriptSrc.includes("'unsafe-inline'")
+      : false;
+  }
+
+  function isLight(csp: string): boolean {
+    const scriptSrc = getDirective(csp, 'script-src');
+    return scriptSrc !== null
+      ? scriptSrc.includes("'unsafe-inline'") && !scriptSrc.includes("'nonce-")
+      : false;
+  }
+
+  it('applies the strict nonce-based CSP to login', async () => {
+    const res = await proxy(makeRequest('https://octo.example.com/login'));
+    expect(isStrict(getCsp(res))).toBe(true);
+  });
+
+  it('applies the strict nonce-based CSP to signup', async () => {
+    const res = await proxy(makeRequest('https://octo.example.com/signup'));
+    expect(isStrict(getCsp(res))).toBe(true);
+  });
+
+  it('applies the strict nonce-based CSP to forgot-password', async () => {
+    const res = await proxy(
+      makeRequest('https://octo.example.com/forgot-password'),
+    );
+    expect(isStrict(getCsp(res))).toBe(true);
+  });
+
+  it('applies the strict nonce-based CSP to dashboard routes', async () => {
+    const res = await proxy(
+      makeRequest('https://octo.example.com/dashboard/wallets/1'),
+    );
+    expect(isStrict(getCsp(res))).toBe(true);
+  });
+
+  it('applies the strict nonce-based CSP to the public checkout', async () => {
+    const res = await proxy(makeRequest('https://octo.example.com/pay/abc'));
+    expect(isStrict(getCsp(res))).toBe(true);
+  });
+
+  it('applies the lighter CSP to the home page (no nonce)', async () => {
+    const res = await proxy(makeRequest('https://octo.example.com/'));
+    expect(isLight(getCsp(res))).toBe(true);
+  });
+
+  it('applies the lighter CSP to docs pages (no nonce)', async () => {
+    const res = await proxy(
+      makeRequest('https://octo.example.com/docs/api/reads'),
+    );
+    expect(isLight(getCsp(res))).toBe(true);
+  });
+
+  it('applies the lighter CSP to privacy/terms pages (no nonce)', async () => {
+    const res = await proxy(makeRequest('https://octo.example.com/privacy'));
+    expect(isLight(getCsp(res))).toBe(true);
+  });
+});

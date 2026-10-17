@@ -2,7 +2,7 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
 import { parseAmount, toApiStroops } from "./amount";
 import type { AuthToken, WalletId } from "./brands";
 import { pageQuery, type Paginated, type PageOpts } from "./pagination";
@@ -30,7 +30,7 @@ export async function listRecentPaymentLinks(
   limit = 20,
 ): Promise<PaymentLink[]> {
   const page = await apiFetch<Paginated<PaymentLink>>(
-    `/v1/wallets/${walletId}/payment-links${pageQuery({ limit })}`,
+    path`/v1/wallets/${walletId}/payment-links` + pageQuery({ limit }),
     { token },
   );
   return page.data;
@@ -43,7 +43,7 @@ export function listPaymentLinksPage(
   opts?: PageOpts,
 ): Promise<Paginated<PaymentLink>> {
   return apiFetch<Paginated<PaymentLink>>(
-    `/v1/wallets/${walletId}/payment-links${pageQuery(opts)}`,
+    path`/v1/wallets/${walletId}/payment-links` + pageQuery(opts),
     { token },
   );
 }
@@ -67,7 +67,7 @@ export function listPaymentLinkPayments(
   opts?: PageOpts,
 ): Promise<Paginated<PaymentLinkPayment>> {
   return apiFetch<Paginated<PaymentLinkPayment>>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}/payments${pageQuery(opts)}`,
+    path`/v1/wallets/${walletId}/payment-links/${linkId}/payments` + pageQuery(opts),
     { token },
   );
 }
@@ -83,7 +83,7 @@ export function createPaymentLink(
     amountUsdcStroops?: number;
   },
 ) {
-  return apiFetch<PaymentLink>(`/v1/wallets/${walletId}/payment-links`, {
+  return apiFetch<PaymentLink>(path`/v1/wallets/${walletId}/payment-links`, {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -102,7 +102,7 @@ export function getPaymentLink(
   linkId: string,
 ) {
   return apiFetch<PaymentLink>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}`,
+    path`/v1/wallets/${walletId}/payment-links/${linkId}`,
     { token },
   );
 }
@@ -114,7 +114,7 @@ export function setPaymentLinkActive(
   active: boolean,
 ) {
   return apiFetch<PaymentLink>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}`,
+    path`/v1/wallets/${walletId}/payment-links/${linkId}`,
     {
       method: "PUT",
       token,
@@ -136,7 +136,7 @@ export type PublicPaymentLink = {
 };
 
 export function getPublicPaymentLink(slug: string) {
-  return apiFetch<PublicPaymentLink>(`/v1/pay/${slug}`);
+  return apiFetch<PublicPaymentLink>(path`/v1/pay/${slug}`);
 }
 
 export type PaymentIntent = {
@@ -151,7 +151,7 @@ export function createPaymentIntent(
   slug: string,
   params: { payerName?: string; payerEmail?: string; amountUsdcStroops?: number },
 ) {
-  return apiFetch<PaymentIntent>(`/v1/pay/${slug}/intent`, {
+  return apiFetch<PaymentIntent>(path`/v1/pay/${slug}/intent`, {
     method: "POST",
     body: JSON.stringify({
       payer_name: params.payerName || null,
@@ -171,7 +171,7 @@ export type PaymentStatus = {
 };
 
 export function getPaymentStatus(slug: string, paymentId: string) {
-  return apiFetch<PaymentStatus>(`/v1/pay/${slug}/payments/${paymentId}`);
+  return apiFetch<PaymentStatus>(path`/v1/pay/${slug}/payments/${paymentId}`);
 }
 
 export type PublicSigningInfo = {
@@ -185,7 +185,7 @@ export type PublicSigningInfo = {
  * built transaction must use, since that account is the transaction's source. */
 export function getPublicSigningInfo(slug: string, account?: string) {
   const qs = account ? `?account=${encodeURIComponent(account)}` : "";
-  return apiFetch<PublicSigningInfo>(`/v1/pay/${slug}/signing-info${qs}`);
+  return apiFetch<PublicSigningInfo>(path`/v1/pay/${slug}/signing-info` + qs);
 }
 
 export type SubmitPaymentResult = {
@@ -206,7 +206,7 @@ export function submitPublicPayment(
   transactionXdr: string,
   paymentId: string,
 ) {
-  return apiFetch<SubmitPaymentResult>(`/v1/pay/${slug}/submit-signed`, {
+  return apiFetch<SubmitPaymentResult>(path`/v1/pay/${slug}/submit-signed`, {
     method: "POST",
     body: JSON.stringify({
       transaction_xdr: transactionXdr,
