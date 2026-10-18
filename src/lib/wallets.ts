@@ -234,7 +234,7 @@ export function listAddressesPage(
   );
 }
 
-/** Lists all wallet addresses across cursor-paginated API responses. */
+/** Lists the first page of wallet addresses. Use `listAddressesPage` to page forward. */
 export async function listAddresses(
   token: string,
   id: string,
@@ -247,7 +247,7 @@ export async function listAddresses(
   return page.data;
 }
 
-/** Lists all wallet transactions across cursor-paginated API responses. */
+/** Lists the first page of wallet transactions. Use `listTransactionsPage` to page forward. */
 export async function listTransactions(
   token: string,
   id: string,
