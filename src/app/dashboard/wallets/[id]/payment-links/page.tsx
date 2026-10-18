@@ -13,7 +13,7 @@ import {
 } from "@/lib/payment-links";
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { formatStroops, sumStroops } from "@/lib/amount";
-import { Modal, CopyField } from "@/components/dashboard/Modal";
+import { Modal, CopyField, ConfirmModal } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
@@ -45,6 +45,7 @@ export default function PaymentLinksPage({
   const [created, setCreated] = useState<PaymentLink | null>(null);
   const [selected, setSelected] = useState<PaymentLink | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deactivating, setDeactivating] = useState<PaymentLink | null>(null);
 
   // Cursor pagination: `cursors[i]` is the `before` cursor for page i+1 (page 1 has none).
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
@@ -112,6 +113,12 @@ export default function PaymentLinksPage({
     const target = cursors[pageIndex - 1];
     setPageIndex((i) => i - 1);
     load(target ?? null);
+  }
+
+  // Deactivating cuts off anyone on the checkout, so it asks first. Reactivating does not.
+  function requestToggle(link: PaymentLink) {
+    if (link.active) setDeactivating(link);
+    else handleToggleActive(link);
   }
 
   async function handleToggleActive(link: PaymentLink) {
@@ -202,7 +209,7 @@ export default function PaymentLinksPage({
                       <PaymentLinkList
                         links={links}
                         onSelect={setSelected}
-                        onToggleActive={handleToggleActive}
+                        onToggleActive={requestToggle}
                       />
                     </table>
                   </div>
@@ -219,6 +226,21 @@ export default function PaymentLinksPage({
             </div>
 
     </WalletPageShell>
+
+      {deactivating && (
+        <ConfirmModal
+          title="Deactivate payment link?"
+          message="Anyone currently on the checkout will see “Link not found” straight away."
+          confirmLabel="Deactivate"
+          destructive
+          onConfirm={() => {
+            const link = deactivating;
+            setDeactivating(null);
+            handleToggleActive(link);
+          }}
+          onClose={() => setDeactivating(null)}
+        />
+      )}
 
       {showCreate && (
         <CreatePaymentLinkForm
