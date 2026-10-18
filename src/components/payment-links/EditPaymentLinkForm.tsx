@@ -7,7 +7,7 @@ import { formatStroops } from "@/lib/amount";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import type { PaymentLink } from "@/lib/payment-links";
 import { updatePaymentLink, validateRedirectUrl } from "@/lib/paymentLinkEditApi";
-import { uploadImage, validateImage } from "@/lib/uploads";
+import { ALLOWED_IMAGE_TYPES, uploadImage, validateImage } from "@/lib/uploads";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground outline-none focus:border-burgundy/50";
@@ -91,7 +91,7 @@ export function EditPaymentLinkForm({
           <div className="flex-1">
             <input
               type="file"
-              accept="image/*"
+              accept={ALLOWED_IMAGE_TYPES.join(",")}
               onChange={handleImageChange}
               disabled={uploading}
               className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-raised file:px-3 file:py-1.5 file:text-xs file:text-foreground hover:file:border-burgundy/50"

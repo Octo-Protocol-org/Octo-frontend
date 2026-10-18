@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/dashboard/Modal";
 import { ActionButton } from "@/components/dashboard/WalletUI";
-import { uploadImage, validateImage } from "@/lib/uploads";
+import { ALLOWED_IMAGE_HINT, ALLOWED_IMAGE_TYPES, uploadImage, validateImage } from "@/lib/uploads";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { validateRedirectUrl } from "@/lib/redirectUrl";
 import { asAuthToken, asWalletId } from "@/lib/brands";
@@ -99,7 +99,7 @@ export function CreatePaymentLinkForm({
             <div className="flex-1">
               <input
                 type="file"
-                accept="image/*"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
                 onChange={handleImageChange}
                 disabled={uploading}
                 className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-raised file:px-3 file:py-1.5 file:text-xs file:text-foreground hover:file:border-burgundy/50"
@@ -109,7 +109,7 @@ export function CreatePaymentLinkForm({
                   ? "Uploading…"
                   : imageUrl
                     ? "Uploaded. Choose another file to replace it."
-                    : "PNG or JPG, up to 2MB."}
+                    : ALLOWED_IMAGE_HINT}
               </p>
             </div>
           </div>

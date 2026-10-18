@@ -47,9 +47,19 @@ export async function uploadImage(token: string, file: File): Promise<string> {
   return body.secure_url as string;
 }
 
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
 
 type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
+
+const FORMAT_NAMES: Record<AllowedImageType, string> = {
+  'image/png': 'PNG',
+  'image/jpeg': 'JPEG',
+  'image/webp': 'WebP',
+  'image/gif': 'GIF',
+};
+
+/** Hint text for image pickers, generated from ALLOWED_IMAGE_TYPES. */
+export const ALLOWED_IMAGE_HINT = `${ALLOWED_IMAGE_TYPES.map((type) => FORMAT_NAMES[type]).join(', ')}, up to 2MB.`;
 
 const MAGIC_NUMBERS: Record<AllowedImageType, number[][]> = {
   'image/png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
