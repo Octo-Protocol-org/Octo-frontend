@@ -16,9 +16,8 @@ export function buildCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
   return [head, ...body].join("\r\n") + "\r\n";
 }
 
-/** Trigger a browser download of the CSV (with a BOM so Excel reads UTF-8). */
-export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
+/** Trigger a browser download. The URL is revoked later, since Safari can cancel a download whose URL is gone. */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -26,7 +25,12 @@ export function downloadCsv(filename: string, csv: string): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Trigger a browser download of the CSV (with a BOM so Excel reads UTF-8). */
+export function downloadCsv(filename: string, csv: string): void {
+  downloadBlob(filename, new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" }));
 }
 
 /** Walk every cursor page, capped so a misbehaving cursor cannot loop forever. */
