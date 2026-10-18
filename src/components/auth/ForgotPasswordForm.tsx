@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError } from "@/lib/api";
 import { requestPasswordReset, resetPassword, MIN_ACCOUNT_PASSWORD_LENGTH } from "@/lib/passwordApi";
@@ -23,6 +23,13 @@ export function ForgotPasswordForm() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   async function onEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +57,17 @@ export function ForgotPasswordForm() {
     }
     setError(null);
     setStep("password");
+  }
+
+  // Sends a fresh code. The 30 s cooldown matches the signup resend button.
+  async function onResend() {
+    setError(null);
+    try {
+      await requestPasswordReset(email.trim());
+      setCooldown(30);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend the code.");
+    }
   }
 
   async function onPassword(e: React.FormEvent) {
@@ -135,6 +153,14 @@ export function ForgotPasswordForm() {
             If an account exists for that email, we sent a 6-digit code to it.
           </p>
           <OtpInput value={code} onChange={setCode} />
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={cooldown > 0}
+            className="text-sm font-medium text-burgundy-bright hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+          >
+            {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+          </button>
           {errorBox}
           <button type="submit" className={buttonClass}>
             Continue
