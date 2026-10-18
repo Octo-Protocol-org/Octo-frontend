@@ -17,7 +17,17 @@ function PaymentLinkRow({
   onToggleActive: (link: PaymentLink) => void;
 }) {
   return (
-    <tr onClick={() => onSelect(link)} className="cursor-pointer transition-colors hover:bg-surface-raised">
+    <tr
+      onClick={() => onSelect(link)}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onSelect(link);
+        }
+      }}
+      tabIndex={0}
+      className="cursor-pointer transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-burgundy-bright"
+    >
       <td className="py-3 pr-4 text-foreground">{link.name}</td>
       <td className="py-3 pr-4 text-foreground">{link.amount_usdc_stroops !== null ? `$${formatStroops(link.amount_usdc_stroops)}` : "Flexible"}</td>
       <td className="py-3 pr-4"><span className={`inline-flex items-center gap-1 text-xs ${link.active ? "text-success" : "text-muted"}`}>{link.active ? "●" : "○"} {link.active ? "Active" : "Inactive"}</span></td>
