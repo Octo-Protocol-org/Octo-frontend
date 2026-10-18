@@ -426,7 +426,7 @@ export default function PayPage({
                   ? `$${formatStroops(link.amount_usdc_stroops)}`
                   : step !== "form" && intent
                     ? `$${formatStroops(intent.amount_usdc_stroops)}`
-                    : amount
+                    : amount && usdAmountToStroops(amount) !== null
                     ? `$${amount}`
                     : "$—"}
               </p>
@@ -493,9 +493,16 @@ export default function PayPage({
                     id="payer-amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                    inputMode="decimal"
+                    aria-invalid={amount.trim() !== "" && usdAmountToStroops(amount) === null}
                     placeholder="0.00"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-black"
                   />
+                  {amount.trim() !== "" && usdAmountToStroops(amount) === null && (
+                    <p role="alert" className="mt-1 text-xs text-red-600">
+                      Enter an amount in USD, up to 7 decimal places.
+                    </p>
+                  )}
                 </Field>
               )}
 
