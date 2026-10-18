@@ -3,14 +3,21 @@ import { useEffect, useRef, type RefObject } from "react";
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-/** Traps Tab focus inside `ref`, focuses it on mount, and restores prior focus on unmount. */
-export function useFocusTrap(ref: RefObject<HTMLElement | null>) {
+/**
+ * Traps Tab focus inside `ref` while `enabled`, focusing it when enabled. Prior focus is
+ * restored on unmount. Nested modals pass `enabled` only for the top one.
+ */
+export function useFocusTrap(ref: RefObject<HTMLElement | null>, enabled = true) {
   const previous = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
     previous.current = document.activeElement as HTMLElement | null;
+    return () => previous.current?.focus?.();
+  }, []);
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || !enabled) return;
     const items = () => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE));
     (items()[0] ?? root).focus();
 
@@ -34,9 +41,6 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>) {
       }
     }
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      previous.current?.focus?.();
-    };
-  }, [ref]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [ref, enabled]);
 }
