@@ -5,7 +5,14 @@ import { AuthWalletScene } from "@/components/auth/AuthWalletScene";
 
 /** Split-screen auth layout: glass form card on the left, brand copy on the
  *  right, both floating over a full-screen underwater "secure deposits" scene. */
-export function AuthShell({ children }: { children: React.ReactNode }) {
+export function AuthShell({
+  children,
+  consent = false,
+}: {
+  children: React.ReactNode;
+  /** Show the signup consent line. Only the signup page sets it. */
+  consent?: boolean;
+}) {
   return (
     <div className="relative min-h-screen">
       {/* Fixed backdrop: burgundy glow + faint isometric grid. The underwater
@@ -46,21 +53,19 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
               </div>
               {children}
 
-              <p className="mx-auto mt-8 max-w-sm text-center text-xs text-muted">
-                By signing up, you agree to our{" "}
-                <Link href="/terms" className="underline">
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link href="/terms" className="underline">
-                  Conditions of use
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="underline">
-                  Privacy policy
-                </Link>
-                .
-              </p>
+              {consent && (
+                <p className="mx-auto mt-8 max-w-sm text-center text-xs text-muted">
+                  By signing up, you agree to our{" "}
+                  <Link href="/terms" className="underline">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="underline">
+                    Privacy policy
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
           </div>
         </div>
