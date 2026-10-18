@@ -24,11 +24,12 @@ import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
 import confetti from "canvas-confetti";
 import { formatStroops } from "@/lib/amount";
+import { ApiError } from "@/lib/api";
 import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { validateRedirectUrl } from "@/lib/redirectUrl";
 
-type Step = "loading" | "not-found" | "form" | "pay" | "confirmed";
+type Step = "loading" | "not-found" | "error" | "form" | "pay" | "confirmed";
 
 /** Keep the loading spinner up for at least this long so it doesn't just flash on fast loads. */
 const MIN_LOADING_MS = 700;
@@ -121,8 +122,11 @@ export default function PayPage({
   const [networkPassphrase, setNetworkPassphrase] = useState<string>("");
   // Ticking clock driving the expiry countdown; null until an intent with an expiry exists.
   const [now, setNow] = useState<number | null>(null);
+  // Bumped by the retry button to load the link again.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setStep("loading");
     const startedAt = Date.now();
     const finish = (next: Step) => {
       const remaining = MIN_LOADING_MS - (Date.now() - startedAt);
@@ -140,8 +144,11 @@ export default function PayPage({
         }
         finish("form");
       })
-      .catch(() => finish("not-found"));
-  }, [slug]);
+      .catch((err: unknown) => {
+        const gone = err instanceof ApiError && (err.status === 404 || err.status === 410);
+        finish(gone ? "not-found" : "error");
+      });
+  }, [slug, attempt]);
 
   // Swaps the active intent, resetting everything that belonged to the previous one.
   function replaceIntent(next: PaymentIntent | null, key = "") {
@@ -446,6 +453,22 @@ export default function PayPage({
           {step === "loading" && (
             <div className="flex h-full items-center justify-center py-12">
               <OctoSpinner size={40} />
+            </div>
+          )}
+
+          {step === "error" && (
+            <div className="flex h-full items-center justify-center text-center">
+              <div>
+                <p className="text-lg font-semibold text-gray-900">Couldn&apos;t load this payment link</p>
+                <p className="mt-2 text-sm text-gray-500">Check your connection and try again.</p>
+                <button
+                  type="button"
+                  onClick={() => setAttempt((n) => n + 1)}
+                  className="mt-4 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  Try again
+                </button>
+              </div>
             </div>
           )}
 
