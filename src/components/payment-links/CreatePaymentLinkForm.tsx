@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/dashboard/Modal";
 import { ActionButton } from "@/components/dashboard/WalletUI";
 import { ALLOWED_IMAGE_HINT, ALLOWED_IMAGE_TYPES, uploadImage, validateImage } from "@/lib/uploads";
-import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { validateRedirectUrl } from "@/lib/redirectUrl";
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { usdAmountToStroops, createPaymentLink, type PaymentLink } from "@/lib/payment-links";
@@ -28,23 +27,24 @@ export function CreatePaymentLinkForm({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [redirectUrl, setRedirectUrl] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Only checks the picked file. Nothing is uploaded until the link is created.
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !token) return;
-    setUploading(true);
+    const file = e.target.files?.[0] ?? null;
     setError(null);
-    try {
-      await validateImage(file);
-      setImageUrl(await uploadImage(token, file));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Image upload failed.");
-    } finally {
-      setUploading(false);
+    if (file) {
+      try {
+        await validateImage(file);
+      } catch (err) {
+        e.target.value = "";
+        setImageFile(null);
+        setError(err instanceof Error ? err.message : "Image upload failed.");
+        return;
+      }
     }
+    setImageFile(file);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -65,10 +65,11 @@ export function CreatePaymentLinkForm({
         setCreating(false);
         return;
       }
+      const uploadedImageUrl = imageFile ? await uploadImage(token, imageFile) : undefined;
       const link = await createPaymentLink(asAuthToken(token), asWalletId(walletId), {
         name: name.trim(),
         description: description.trim() || undefined,
-        imageUrl: imageUrl ?? undefined,
+        imageUrl: uploadedImageUrl,
         redirectUrl: redirectUrl.trim() || undefined,
         amountUsdcStroops: amountUsdcStroops ?? undefined,
       });
@@ -89,27 +90,21 @@ export function CreatePaymentLinkForm({
           </label>
           <div className="mt-1 flex items-center gap-3">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-sunken">
-              {isTrustedImageUrl(imageUrl) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl!} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-lg text-muted">🖼</span>
-              )}
+              <span className="px-1 text-center text-[10px] text-muted">
+                {imageFile ? imageFile.name : "🖼"}
+              </span>
             </div>
             <div className="flex-1">
               <input
                 type="file"
                 accept={ALLOWED_IMAGE_TYPES.join(",")}
                 onChange={handleImageChange}
-                disabled={uploading}
                 className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-raised file:px-3 file:py-1.5 file:text-xs file:text-foreground hover:file:border-burgundy/50"
               />
               <p className="mt-1 text-[11px] text-muted">
-                {uploading
-                  ? "Uploading…"
-                  : imageUrl
-                    ? "Uploaded. Choose another file to replace it."
-                    : ALLOWED_IMAGE_HINT}
+                {imageFile
+                  ? "Uploads when you create the link. Choose another file to replace it."
+                  : ALLOWED_IMAGE_HINT}
               </p>
             </div>
           </div>
@@ -178,7 +173,7 @@ export function CreatePaymentLinkForm({
           </button>
           <ActionButton
             label={creating ? "Creating…" : "Create Link"}
-            disabled={!name.trim() || creating || uploading}
+            disabled={!name.trim() || creating}
             loading={creating}
           />
         </div>
