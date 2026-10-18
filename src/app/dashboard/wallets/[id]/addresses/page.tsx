@@ -1,18 +1,18 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
-  listAddresses,
-  listRecentAddresses,
+  listAddressesPage,
   createAddress,
   type Address,
 } from "@/lib/wallets";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { AddressSearchBox } from "@/components/addresses/AddressSearchBox";
 import { filterAddressesByRef } from "@/lib/addressSearch";
 import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
@@ -40,35 +40,50 @@ export default function AddressesPage({
   const [selected, setSelected] = useState<Address | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // `cursors[i]` is the `before` cursor for page i+1; the API has no offsets, so Prev is a pop.
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    (before: string | null) => {
+      if (!token) return;
+      setRefreshing(true);
+      listAddressesPage(token, id, { before })
+        .then((page) => {
+          setAddresses(page.data);
+          setNextCursor(page.next_cursor);
+          setError(null);
+        })
+        .catch((e) => {
+          setError(e instanceof Error ? e.message : "Could not load addresses.");
+        })
+        .finally(() => setRefreshing(false));
+    },
+    [token, id],
+  );
+
   function refresh() {
-    if (!token) return;
-    setRefreshing(true);
-    listRecentAddresses(token, id)
-      .then((a) => {
-        setAddresses(a);
-        setError(null);
-      })
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not load addresses."),
-      )
-      .finally(() => setRefreshing(false));
+    load(cursors[pageIndex] ?? null);
   }
 
   useEffect(() => {
-    if (!token) return;
-    const controller = new AbortController();
-    listAddresses(token, id, { signal: controller.signal })
-      .then((a) => {
-        setAddresses(a);
-        setError(null);
-      })
-      .catch((e) => {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        setAddresses([]);
-        setError(e instanceof Error ? e.message : "Could not load addresses.");
-      });
-    return () => controller.abort();
-  }, [token, id]);
+    load(null);
+  }, [load]);
+
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    load(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    load(target ?? null);
+  }
 
   async function handleNewAddress(customerRef?: string) {
     if (!token) return;
@@ -113,11 +128,11 @@ export default function AddressesPage({
 
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Stat label="Total addresses" value={String(addresses.length)} />
+              <Stat label="Addresses on this page" value={String(addresses.length)} />
               <Stat
                 label="Total received"
                 value={`${formatStroops(totalReceived)} XLM`}
-                sub="Across all addresses"
+                sub="Across this page only"
               />
               <Stat
                 label="Address type"
@@ -180,6 +195,14 @@ export default function AddressesPage({
                   </table>
                 </div>
               )}
+              <Pagination
+                page={pageIndex + 1}
+                hasPrev={pageIndex > 0}
+                hasNext={nextCursor !== null}
+                loading={refreshing}
+                onPrev={goPrev}
+                onNext={goNext}
+              />
             </Panel>
           </div>
 
