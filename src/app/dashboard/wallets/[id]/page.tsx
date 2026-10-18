@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { TrustlineModal, DepositModal, WithdrawModal } from "@/components/wallets/WalletModals";
 import { RecoverWalletModal } from "@/components/wallets/RecoverWalletModal";
@@ -11,7 +12,6 @@ import { errorMessage } from "@/lib/api";
 import {
   getBalances,
   listAddresses,
-  listTransactions,
   listRecentTransactions,
   createAddress,
   type Balance,
@@ -83,7 +83,7 @@ export default function WalletOverview({
         if (e instanceof DOMException && e.name === "AbortError") return;
         setAddresses([]);
       }),
-      listTransactions(token, id, { signal: controller.signal }).then(setTxns).catch((e) => {
+      listRecentTransactions(token, id, { signal: controller.signal }).then(setTxns).catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setTxns([]);
       }),
@@ -170,7 +170,7 @@ export default function WalletOverview({
                   Promise.all([
                     getBalances(token, id).then(setBalances).catch((e) => setLoadError(errorMessage(e, "Could not load wallet data."))),
                     listAddresses(token, id).then(setAddresses).catch(() => {}),
-                    listTransactions(token, id).then(setTxns).catch(() => {}),
+                    listRecentTransactions(token, id).then(setTxns).catch(() => {}),
                   ]).finally(() => setStatsLoading(false));
                 }
               }} />
@@ -319,7 +319,17 @@ export default function WalletOverview({
             </div>
 
             {/* recent transactions */}
-            <Panel title="Most recent transactions">
+            <Panel
+              title="Most recent transactions"
+              action={
+                <Link
+                  href={`/dashboard/wallets/${id}/transactions`}
+                  className="text-xs font-medium text-burgundy-bright hover:underline"
+                >
+                  View all
+                </Link>
+              }
+            >
               {statsLoading ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
