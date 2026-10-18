@@ -210,6 +210,7 @@ export default function PaymentLinksPage({
                         links={links}
                         onSelect={setSelected}
                         onToggleActive={requestToggle}
+                        walletId={id}
                       />
                     </table>
                   </div>

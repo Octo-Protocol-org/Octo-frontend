@@ -7,10 +7,12 @@ import { RelativeTime } from "@/components/RelativeTime";
 
 function PaymentLinkRow({
   link,
+  walletId,
   onSelect,
   onToggleActive,
 }: {
   link: PaymentLink;
+  walletId: string;
   onSelect: (link: PaymentLink) => void;
   onToggleActive: (link: PaymentLink) => void;
 }) {
@@ -22,13 +24,13 @@ function PaymentLinkRow({
       <td className="py-3 pr-4 font-medium text-foreground">${formatStroops(link.collected_usdc_stroops)}</td>
       <td className="py-3 pr-4 text-muted"><RelativeTime date={link.created_at} /></td>
       <td className="py-3 text-right">
-        <Link href={`payment-links/${link.id}/edit`} onClick={(e) => e.stopPropagation()} className="mr-3 text-xs text-muted hover:text-foreground">Edit</Link>
+        <Link href={`/dashboard/wallets/${walletId}/payment-links/${encodeURIComponent(link.id)}/edit`} onClick={(e) => e.stopPropagation()} className="mr-3 text-xs text-muted hover:text-foreground">Edit</Link>
         <button type="button" onClick={(e) => { e.stopPropagation(); onToggleActive(link); }} className="text-xs text-muted hover:text-foreground">{link.active ? "Deactivate" : "Activate"}</button>
       </td>
     </tr>
   );
 }
 
-export function PaymentLinkList({ links, onSelect, onToggleActive }: { links: PaymentLink[]; onSelect: (link: PaymentLink) => void; onToggleActive: (link: PaymentLink) => void }) {
-  return <tbody className="divide-y divide-divider">{links.map((link) => <PaymentLinkRow key={link.id} link={link} onSelect={onSelect} onToggleActive={onToggleActive} />)}</tbody>;
+export function PaymentLinkList({ links, walletId, onSelect, onToggleActive }: { links: PaymentLink[]; walletId: string; onSelect: (link: PaymentLink) => void; onToggleActive: (link: PaymentLink) => void }) {
+  return <tbody className="divide-y divide-divider">{links.map((link) => <PaymentLinkRow key={link.id} link={link} walletId={walletId} onSelect={onSelect} onToggleActive={onToggleActive} />)}</tbody>;
 }
