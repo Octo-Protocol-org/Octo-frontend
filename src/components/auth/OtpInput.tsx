@@ -7,10 +7,14 @@ export function OtpInput({
   value,
   onChange,
   disabled,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
 }: {
   value: string;
   onChange: (code: string) => void;
   disabled?: boolean;
+  "aria-describedby"?: string;
+  "aria-invalid"?: "true" | "false";
 }) {
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
@@ -50,6 +54,8 @@ export function OtpInput({
           inputMode="numeric"
           autoComplete={i === 0 ? "one-time-code" : "off"}
           aria-label={`Digit ${i + 1} of 6`}
+          aria-describedby={describedBy}
+          aria-invalid={invalid}
           maxLength={1}
           className="h-12 w-10 rounded-lg border border-border bg-surface-sunken text-center text-lg font-semibold text-foreground focus:border-burgundy-bright focus:outline-none disabled:opacity-60"
         />
