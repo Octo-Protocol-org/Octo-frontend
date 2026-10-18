@@ -16,7 +16,7 @@ import { Pagination } from "@/components/dashboard/Pagination";
 import { AddressSearchBox } from "@/components/addresses/AddressSearchBox";
 import { filterAddressesByRef } from "@/lib/addressSearch";
 import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
-import { formatStroops, sumStroops } from "@/lib/amount";
+import { formatStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
@@ -99,8 +99,6 @@ export default function AddressesPage({
     }
   }
 
-  const totalReceived = sumStroops(addresses.map((a) => a.received_stroops));
-
   if (loading || !user) {
     return (
       <PageSpinner />
@@ -127,13 +125,8 @@ export default function AddressesPage({
             </div>
 
             {/* stat cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               <Stat label="Addresses on this page" value={String(addresses.length)} />
-              <Stat
-                label="Total received"
-                value={`${formatStroops(totalReceived)} XLM`}
-                sub="Across this page only"
-              />
               <Stat
                 label="Address type"
                 value="Muxed (M…)"
@@ -235,9 +228,7 @@ function AddressRow({
       </td>
       <td className="py-3 pr-4 font-mono text-muted">{address.memo_id}</td>
       <td className="py-3 font-medium text-foreground">
-        {address.received_stroops > 0
-          ? `${formatStroops(address.received_stroops)} XLM`
-          : "$0"}
+        {formatStroops(address.received_stroops)}
       </td>
     </tr>
   );
@@ -256,7 +247,10 @@ function AddressDetail({
         <div className="rounded-lg bg-surface-sunken p-3 text-center">
           <p className="text-xs text-muted">Total received</p>
           <p className="mt-1 text-xl font-semibold text-foreground">
-            {formatStroops(address.received_stroops)} XLM
+            {formatStroops(address.received_stroops)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            Deposits across all assets; see Transactions for per-asset amounts.
           </p>
         </div>
 
