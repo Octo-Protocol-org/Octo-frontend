@@ -7,6 +7,7 @@ import { Modal } from "@/components/dashboard/Modal";
 export const MAX_CUSTOMER_REF_LENGTH = 64;
 
 /** Asks for an optional customer reference before an address is generated. */
+/** Asks for an optional customer reference before an address is generated. */
 export function NewAddressModal({
   onSubmit,
   onClose,
