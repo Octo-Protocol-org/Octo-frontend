@@ -82,8 +82,7 @@ export default function DashboardHome() {
 
   useEffect(() => {
     loadPage(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [loadPage]);
 
   function goNext() {
     if (!nextCursor) return;

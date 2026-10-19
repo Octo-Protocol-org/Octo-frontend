@@ -57,6 +57,13 @@ function useAuthSession() {
     setRetryNonce((n) => n + 1);
   }
 
+  // The effects below read the latest sign-out and retry functions through refs, so each
+  // effect only re-runs when its own inputs change.
+  const signOutRef = useRef(doSignOut);
+  signOutRef.current = doSignOut;
+  const retryRef = useRef(retrySessionCheck);
+  retryRef.current = retrySessionCheck;
+
   useEffect(() => {
     const startedAt = Date.now();
     let active = true;
@@ -75,7 +82,7 @@ function useAuthSession() {
       .catch((err: unknown) => {
         if (!active) return;
         if (isAuthenticationFailure(err)) {
-          doSignOut("expired");
+          signOutRef.current("expired");
           return;
         }
         const message =
@@ -84,7 +91,7 @@ function useAuthSession() {
             : "We could not verify your session. Check your connection and try again.";
         setAuthError(message);
         toast.error(message, {
-          action: { label: "Retry", onClick: retrySessionCheck },
+          action: { label: "Retry", onClick: () => retryRef.current() },
         });
       })
       .finally(() => {
@@ -100,25 +107,24 @@ function useAuthSession() {
     return () => {
       active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, retryNonce]);
 
   useEffect(() => {
     // Handle 401 from any apiFetch anywhere on the page — apiFetch dispatches this event.
     function onSessionExpired() {
-      doSignOut("expired");
+      signOutRef.current("expired");
     }
 
     // Sign out when another tab removes the token from storage.
     function onStorage(e: StorageEvent) {
       if (e.key === "octo_token" && e.newValue === null) {
-        doSignOut();
+        signOutRef.current();
       }
     }
 
     // Sign out when another tab broadcasts a logout over BroadcastChannel.
     const unsubscribeLogout = subscribeToLogout(() => {
-      doSignOut();
+      signOutRef.current();
     });
 
     window.addEventListener("session-expired", onSessionExpired);
@@ -128,7 +134,6 @@ function useAuthSession() {
       window.removeEventListener("session-expired", onSessionExpired);
       window.removeEventListener("storage", onStorage);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   /** Explicit logout (e.g. sidebar button). */

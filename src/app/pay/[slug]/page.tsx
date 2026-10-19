@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { CopyButton } from "@/components/CopyButton";
 import { AddressQrCode } from "@/components/qr/AddressQrCode";
@@ -162,29 +162,35 @@ export default function PayPage({
   }
 
   // The single path for every confirmation source (poll, check-now, Freighter).
-  function markConfirmed(paymentId: string) {
-    if (confirmedRef.current) return;
-    confirmedRef.current = true;
-    setStep("confirmed");
-    celebrate();
-    if (link?.redirect_url) {
-      redirectAfterConfirm(link.redirect_url, paymentId, slug);
-    }
-  }
+  const markConfirmed = useCallback(
+    (paymentId: string) => {
+      if (confirmedRef.current) return;
+      confirmedRef.current = true;
+      setStep("confirmed");
+      celebrate();
+      if (link?.redirect_url) {
+        redirectAfterConfirm(link.redirect_url, paymentId, slug);
+      }
+    },
+    [link, slug],
+  );
 
   // Handles a status response for `paymentId`; returns true once resolved. Stale intents are ignored.
-  function applyStatus(paymentId: string, status: PaymentStatus): boolean {
-    if (intentRef.current?.intent.payment_id !== paymentId || confirmedRef.current) return true;
-    if (status.status === "confirmed") {
-      markConfirmed(paymentId);
-      return true;
-    }
-    if (status.status === "expired" || status.status === "underpaid" || status.status === "overpaid") {
-      setResolvedStatus(status);
-      return true;
-    }
-    return false;
-  }
+  const applyStatus = useCallback(
+    (paymentId: string, status: PaymentStatus): boolean => {
+      if (intentRef.current?.intent.payment_id !== paymentId || confirmedRef.current) return true;
+      if (status.status === "confirmed") {
+        markConfirmed(paymentId);
+        return true;
+      }
+      if (status.status === "expired" || status.status === "underpaid" || status.status === "overpaid") {
+        setResolvedStatus(status);
+        return true;
+      }
+      return false;
+    },
+    [markConfirmed],
+  );
 
   // Expiry is derived from the intent's expires_at so the UI can't drift from the backend.
   const expiresAtMs = intent?.expires_at ? Date.parse(intent.expires_at) : NaN;
@@ -270,8 +276,7 @@ export default function PayPage({
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent, step, slug, link, resolvedStatus, pollStopped, freighterBusy]);
+  }, [intent, step, slug, link, resolvedStatus, pollStopped, freighterBusy, applyStatus]);
 
   // Flips the UI to the expired state the moment the countdown hits zero.
   useEffect(() => {
