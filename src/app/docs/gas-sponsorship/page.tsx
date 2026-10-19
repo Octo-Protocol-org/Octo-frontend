@@ -83,9 +83,9 @@ export default function GasSponsorship() {
         ]}
       />
 
-      <Code label="Request">{`curl -X PUT ${API_URL}/v1/wallets/<WALLET_ID>/sponsorship \\\\
-  -H "authorization: Bearer eyJ…" \\\\
-  -H "content-type: application/json" \\\\
+      <Code label="Request">{`curl -X PUT ${API_URL}/v1/wallets/<WALLET_ID>/sponsorship \\
+  -H "authorization: Bearer eyJ…" \\
+  -H "content-type: application/json" \\
   -d '{
     "enabled": true,
     "per_tx_fee_cap_stroops": 100000,       // 0.01 XLM
@@ -119,7 +119,7 @@ export default function GasSponsorship() {
         saved). Requires a dashboard login token.
       </p>
 
-      <Code label="Request">{`curl ${API_URL}/v1/wallets/<WALLET_ID>/sponsorship \\\\
+      <Code label="Request">{`curl ${API_URL}/v1/wallets/<WALLET_ID>/sponsorship \\
   -H "authorization: Bearer eyJ…"`}</Code>
 
       <Code label="Response (200)">{`{
@@ -168,9 +168,9 @@ export default function GasSponsorship() {
         wallet itself.
       </Callout>
 
-      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/sponsor \\\\
-  -H "authorization: Bearer octo_sk_test_abc123…" \\\\
-  -H "content-type: application/json" \\\\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/sponsor \\
+  -H "authorization: Bearer octo_sk_test_abc123…" \\
+  -H "content-type: application/json" \\
   -d '{
     "transaction_xdr": "AAAAAgAAAAD…",
     "max_base_fee_stroops": 100000           // 0.01 XLM
@@ -227,7 +227,7 @@ export default function GasSponsorship() {
         ]}
       />
 
-      <Code label="Request">{`curl "${API_URL}/v1/wallets/<WALLET_ID>/sponsored-transactions?limit=50&status=confirmed" \\\\
+      <Code label="Request">{`curl "${API_URL}/v1/wallets/<WALLET_ID>/sponsored-transactions?limit=50&status=confirmed" \\
   -H "authorization: Bearer eyJ…"`}</Code>
 
       <Code label="Response (200)">{`{

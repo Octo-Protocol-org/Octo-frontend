@@ -64,6 +64,7 @@ export default function DashboardHome() {
     "Could not load your wallets.",
     Boolean(token),
   );
+
   const loadError = loadErrorMessage !== null;
   // Null while a page loads or before the first one arrives, so the list shows its skeleton.
   const wallets = loaded && !loadingPage ? pageWallets : null;

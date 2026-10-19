@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { listAllWallets, type WalletView } from "@/lib/wallets";
@@ -26,7 +26,8 @@ export default function SponsorshipPage() {
   const [rows, setRows] = useState<WalletSponsorship[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  function loadData(signal?: AbortSignal) {
+  const loadData = useCallback(
+    (signal?: AbortSignal) => {
     if (!token) return;
     setLoadError(null);
     listAllWallets(token)
@@ -56,15 +57,16 @@ export default function SponsorshipPage() {
         setRows([]);
         setLoadError(errorMessage(e, "Could not load sponsorship data."));
       });
-  }
+    },
+    [token],
+  );
 
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
     loadData(controller.signal);
     return () => controller.abort();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, loadData]);
 
   if (loading || !user) {
     return (
