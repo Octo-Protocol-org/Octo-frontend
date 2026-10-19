@@ -11,7 +11,7 @@ import {
 import { PageSpinner } from "@/components/OctoSpinner";
 import { CopyButton } from "@/components/CopyButton";
 import { Modal } from "@/components/dashboard/Modal";
-import { ApiError, API_URL } from "@/lib/api";
+import { API_URL, errorMessage } from "@/lib/api";
 import { Code } from "@/components/docs/DocsUI";
 import { toast } from "sonner";
 
@@ -64,7 +64,7 @@ export default function DevelopersPage({
       setKeyInfo({ wallet_id: id, configured: true, prefix: res.prefix });
     } catch (err) {
       toast.error(
-        err instanceof ApiError ? err.message : "Failed to generate API key.",
+        errorMessage(err, "Failed to generate API key."),
       );
     } finally {
       setGenerating(false);

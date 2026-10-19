@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useState } from "react";
 import { Modal } from "@/components/dashboard/Modal";
 import type { WalletView } from "@/lib/wallets";
@@ -47,7 +48,7 @@ export function EditWalletDetails({
       onSaved({ ...(wallet as WalletView), ...updated });
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update the wallet.");
+      setError(errorMessage(err, "Could not update the wallet."));
     } finally {
       setSaving(false);
     }

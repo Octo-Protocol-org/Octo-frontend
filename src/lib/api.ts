@@ -26,6 +26,11 @@ export class ApiError extends Error {
  * Prefers the `ApiError` message (already saned by `apiFetch`), falls back to any
  * `Error.message`, and lastly to the caller's `fallback` for non-Error throws.
  */
+/** The message of an error, or null when the value is not an Error. For callers that choose their own fallback. */
+export function errorText(err: unknown): string | null {
+  return err instanceof Error ? err.message : null;
+}
+
 export function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
   if (err instanceof Error) return err.message;

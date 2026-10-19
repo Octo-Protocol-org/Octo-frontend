@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
+import { errorText } from "@/lib/api";
 import type { Balance } from "@/lib/wallets";
 import { DEFAULT_BASE_RESERVE_STROOPS } from "@/lib/stellar/reserve";
 import {
@@ -63,9 +63,7 @@ export function TrustlineDetails({
       }
     } catch (err) {
       toast.error(
-        err instanceof ApiError || err instanceof Error
-          ? friendlyResultMessage(err.message, "Could not remove the trustline.")
-          : "Could not remove the trustline.",
+        friendlyResultMessage(errorText(err), "Could not remove the trustline."),
       );
     } finally {
       setPassword("");

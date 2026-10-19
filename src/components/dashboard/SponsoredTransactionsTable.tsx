@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useEffect, useState } from "react";
 import {
   listSponsoredTransactions,
@@ -43,7 +44,7 @@ export function SponsoredTransactionsTable({
       .catch((e) => {
         if (!active) return;
         setRows([]);
-        setLoadError(e instanceof Error ? e.message : "Could not load sponsored transactions.");
+        setLoadError(errorMessage(e, "Could not load sponsored transactions."));
       });
     return () => {
       active = false;
@@ -61,7 +62,7 @@ export function SponsoredTransactionsTable({
       setCursor(page.next_cursor);
     } catch (e) {
       // Keep the existing rows and surface the failure so the user can retry.
-      setMoreError(e instanceof Error ? e.message : "Could not load more transactions.");
+      setMoreError(errorMessage(e, "Could not load more transactions."));
     } finally {
       setLoadingMore(false);
     }

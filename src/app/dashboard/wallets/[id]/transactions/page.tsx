@@ -1,6 +1,8 @@
 "use client";
 
-import { use, useCallback, useEffect, useRef, useMemo, useState } from "react";
+import { errorMessage } from "@/lib/api";
+import { use, useCallback, useMemo, useState } from "react";
+import { useCursorPagination } from "@/lib/useCursorPagination";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
@@ -32,82 +34,35 @@ export default function TransactionsPage({
   const { user, token, loading } = useAuth();
 
   const { wallet } = useWallet(id);
-  const [txns, setTxns] = useState<Transaction[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const [assetFilter, setAssetFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Transaction | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Cursor pagination: `cursors[i]` is the `before` cursor for page i+1 (page 1 has none), so
-  // Prev is just a pop. The API has no offsets, so pages can only be walked in order.
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  // Latest non-silent request id; a response that no longer matches it is stale and dropped.
-  const latestReq = useRef(0);
-
-  const load = useCallback(
-    (before: string | null, opts?: { silent?: boolean }) => {
-      if (!token) return;
-      const reqId = opts?.silent ? latestReq.current : ++latestReq.current;
-      if (!opts?.silent) setRefreshing(true);
-      return listTransactionsPage(token, id, { before })
-        .then((page) => {
-          if (reqId !== latestReq.current) return;
-          setTxns(page.data);
-          setNextCursor(page.next_cursor);
-          setError(null);
-        })
-        .catch((e) => {
-          // A silent background refresh failing is not worth interrupting the user over; an
-          // explicit action failing is.
-          if (!opts?.silent) {
-            setError(
-              e instanceof Error ? e.message : "Could not load transactions.",
-            );
-          }
-        })
-        .finally(() => {
-          if (!opts?.silent) setRefreshing(false);
-        });
-    },
-    [token, id],
+  const {
+    rows: txns,
+    setRows: setTxns,
+    page,
+    hasPrev,
+    hasNext,
+    loading: refreshing,
+    error,
+    refresh,
+    refreshSilently,
+    next,
+    prev,
+  } = useCursorPagination(
+    (before) => listTransactionsPage(token ?? "", id, { before }),
+    [id, token],
+    "Could not load transactions.",
+    Boolean(token),
   );
-
-  function refresh() {
-    load(cursors[pageIndex] ?? null);
-  }
-
-  useEffect(() => {
-    if (!token) return;
-    load(null);
-  }, [token, id, load]);
 
   // Silently re-fetch in the background so a deposit (e.g. from a payment link) shows up without
   // needing a manual refresh. Only page 1 auto-refreshes — re-fetching a deeper page would fight
   // the user as rows shift underneath them.
-  const pollFn = useCallback(
-    async () => {
-      if (!token || pageIndex !== 0) return;
-      await load(null, { silent: true });
-    },
-    [token, pageIndex, load],
-  );
+  const pollFn = useCallback(async () => {
+    if (!token || hasPrev) return;
+    await refreshSilently();
+  }, [token, hasPrev, refreshSilently]);
   usePolling(pollFn, 5000);
-
-  function goNext() {
-    if (!nextCursor) return;
-    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
-    setPageIndex((i) => i + 1);
-    load(nextCursor);
-  }
-
-  function goPrev() {
-    if (pageIndex === 0) return;
-    const target = cursors[pageIndex - 1];
-    setPageIndex((i) => i - 1);
-    load(target ?? null);
-  }
 
   // Tabs are per-asset (not per-status or per-op-type, which don't exist on Stellar the way
   // they do on an EVM chain): "All" plus one tab per distinct `code:issuer` asset this wallet
@@ -172,7 +127,7 @@ export default function TransactionsPage({
               <Stat
                 label="On this page"
                 value={String(txns.length)}
-                sub={pageIndex > 0 || nextCursor ? `Page ${pageIndex + 1}` : undefined}
+                sub={hasPrev || hasNext ? `Page ${page}` : undefined}
               />
               <Stat label="Deposits" value={String(totalDeposits)} />
               <Stat label="Withdrawals" value={String(totalWithdrawals)} />
@@ -257,12 +212,12 @@ export default function TransactionsPage({
                 </div>
               )}
               <Pagination
-                page={pageIndex + 1}
-                hasPrev={pageIndex > 0}
-                hasNext={nextCursor !== null}
+                page={page}
+                hasPrev={hasPrev}
+                hasNext={hasNext}
                 loading={refreshing}
-                onPrev={goPrev}
-                onNext={goNext}
+                onPrev={prev}
+                onNext={next}
               />
             </Panel>
           </div>

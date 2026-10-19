@@ -1,11 +1,12 @@
 "use client";
 
+import { formatCountdownSeconds } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { Modal, CopyField, HighlightedAddress } from "@/components/dashboard/Modal";
 import { DepositQrCodes } from "@/components/qr/DepositQrCodes";
-import { ApiError } from "@/lib/api";
+import { errorMessage, errorText } from "@/lib/api";
 import { usdcForNetwork, type Address, type Balance } from "@/lib/wallets";
 import { explorerTxUrl, network } from "@/lib/network";
 import { Transaction, TransactionBuilder, FeeBumpTransaction } from "@stellar/stellar-base";
@@ -64,12 +65,7 @@ export function TrustlineModal({
         detail: res.detail ?? null,
       });
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Could not add the trustline.";
+      const message = errorMessage(err, "Could not add the trustline.");
       setError(message);
       toast.error(message);
     } finally {
@@ -232,10 +228,6 @@ type WithdrawAsset = {
 
 /** Stop accepting the code this long before maxTime so the relay can still reach the network. */
 const EXPIRY_MARGIN_MS = 10_000;
-
-function formatCountdown(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
 
 export function WithdrawModal({
   token,
@@ -404,7 +396,7 @@ export function WithdrawModal({
       setReviewed(true);
       setSubmitting(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to validate destination";
+      const message = errorMessage(err, "Failed to validate destination");
       setError(message);
       setSubmitting(false);
     }
@@ -484,7 +476,7 @@ export function WithdrawModal({
       setPendingXdr(signedXdr);
     } catch (err) {
       const message = friendlyResultMessage(
-        err instanceof Error ? err.message : null,
+        errorText(err),
         "Withdrawal failed.",
       );
       setError(message);
@@ -504,7 +496,7 @@ export function WithdrawModal({
       setNow(Date.now());
       toast.success("A new code is on its way.");
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Could not resend the code.";
+      const message = errorMessage(err, "Could not resend the code.");
       setError(message);
       toast.error(message);
     } finally {
@@ -532,7 +524,7 @@ export function WithdrawModal({
         toast.error(friendlyResultMessage(res.detail, "The withdrawal was not confirmed."));
       }
     } catch (err) {
-      const raw = err instanceof ApiError ? err.message : null;
+      const raw = errorText(err);
       if (isExpiredResult(raw)) {
         setNetworkExpired(true);
         return;
@@ -817,7 +809,7 @@ export function WithdrawModal({
           aria-live="polite"
         >
           Expires in{" "}
-          <span className="font-mono text-foreground">{formatCountdown(secondsLeft)}</span>
+          <span className="font-mono text-foreground">{formatCountdownSeconds(secondsLeft)}</span>
         </p>
 
         <div className="mt-4">

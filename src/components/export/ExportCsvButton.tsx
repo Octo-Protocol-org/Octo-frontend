@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useState } from "react";
 import { ActionButton } from "@/components/dashboard/WalletUI";
 import { buildCsv, downloadCsv, type CsvColumn } from "@/lib/csv";
@@ -25,7 +26,7 @@ export function ExportCsvButton<T>({
     try {
       downloadCsv(filename, buildCsv(await loadRows(), columns));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Export failed.");
+      setError(errorMessage(e, "Export failed."));
     } finally {
       setBusy(false);
     }

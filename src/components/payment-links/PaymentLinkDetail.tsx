@@ -1,5 +1,7 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
+import { payUrl } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { formatStroops } from "@/lib/amount";
@@ -9,11 +11,6 @@ import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { PayWithOctoSnippet } from "@/components/payment-links/PayWithOctoSnippet";
 import { ExportPaymentLinkPaymentsCsvButton } from "@/components/export/ExportPaymentLinkPaymentsCsvButton";
 import { PaymentsTable } from "./PaymentsTable";
-
-function payUrl(slug: string): string {
-  if (typeof window === "undefined") return `/pay/${slug}`;
-  return `${window.location.origin}/pay/${slug}`;
-}
 
 export function PaymentLinkDetail({
   link,
@@ -41,7 +38,7 @@ export function PaymentLinkDetail({
       })
       .catch((e) =>
         setPaymentsError(
-          e instanceof Error ? e.message : "Could not load payments.",
+          errorMessage(e, "Could not load payments."),
         ),
       );
   }, [token, walletId, link.id]);
@@ -57,7 +54,7 @@ export function PaymentLinkDetail({
       setPayments((prev) => [...(prev ?? []), ...page.data]);
       setNextCursor(page.next_cursor);
     } catch (e) {
-      setPaymentsError(e instanceof Error ? e.message : "Could not load payments.");
+      setPaymentsError(errorMessage(e, "Could not load payments."));
     } finally {
       setLoadingMore(false);
     }
