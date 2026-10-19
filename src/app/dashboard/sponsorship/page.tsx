@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
@@ -53,7 +54,7 @@ export default function SponsorshipPage() {
       .catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setRows([]);
-        setLoadError(e instanceof Error ? e.message : "Could not load sponsorship data.");
+        setLoadError(errorMessage(e, "Could not load sponsorship data."));
       });
   }
 

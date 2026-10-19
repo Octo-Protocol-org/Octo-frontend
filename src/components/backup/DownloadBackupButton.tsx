@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { getBackup, loadLocalBackup, parseBackup, saveLocalBackup, decryptSeed, fromMnemonic } from "@/lib/sdk";
@@ -35,7 +36,7 @@ export function DownloadBackupButton({
         new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not download the backup.");
+      toast.error(errorMessage(err, "Could not download the backup."));
     } finally {
       setBusy(false);
     }
@@ -74,7 +75,7 @@ export function DownloadBackupButton({
       saveLocalBackup(walletId, backup);
       toast.success("Backup imported. Unlock with your wallet password to use it.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not import the backup file.");
+      toast.error(errorMessage(err, "Could not import the backup file."));
     }
   }
 

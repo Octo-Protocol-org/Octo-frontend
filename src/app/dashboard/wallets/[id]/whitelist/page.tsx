@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { use, useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
@@ -72,7 +73,7 @@ export default function WhitelistPage({
     } catch (e) {
       setAllowlistLoadState("error");
       setAllowlistLoadError(
-        e instanceof Error ? e.message : "Could not load the withdrawal allowlist.",
+        errorMessage(e, "Could not load the withdrawal allowlist."),
       );
     }
   }, [token, id]);
@@ -96,7 +97,7 @@ export default function WhitelistPage({
         next ? "Withdrawal allowlist enabled." : "Withdrawal allowlist disabled.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update the allowlist.");
+      setError(errorMessage(e, "Could not update the allowlist."));
     } finally {
       setToggling(false);
     }
@@ -142,7 +143,7 @@ export default function WhitelistPage({
       setAddrError(null);
       toast.success("Address added to the withdrawal allowlist.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add that address.");
+      setError(errorMessage(e, "Could not add that address."));
     } finally {
       setAdding(false);
     }
@@ -163,7 +164,7 @@ export default function WhitelistPage({
       setPendingRemoval(null);
       toast.success("Address removed from the withdrawal allowlist.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not remove that address.");
+      setError(errorMessage(e, "Could not remove that address."));
     } finally {
       setRemovingId(null);
     }

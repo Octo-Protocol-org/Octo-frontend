@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { use, useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
@@ -63,7 +64,7 @@ export default function TransactionsPage({
           // explicit action failing is.
           if (!opts?.silent) {
             setError(
-              e instanceof Error ? e.message : "Could not load transactions.",
+              errorMessage(e, "Could not load transactions."),
             );
           }
         })

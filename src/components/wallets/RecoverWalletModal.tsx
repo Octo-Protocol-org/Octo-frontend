@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/dashboard/Modal";
@@ -61,7 +62,7 @@ export function RecoverWalletModal({
       }
       setStep("password");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid recovery phrase.");
+      setError(errorMessage(err, "Invalid recovery phrase."));
     } finally {
       setBusy(false);
     }
@@ -107,7 +108,7 @@ export function RecoverWalletModal({
       saveLocalBackup(walletId, backup, uploaded.backup_version ?? serialized);
       setStep("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the backup.");
+      setError(errorMessage(err, "Could not save the backup."));
       toast.error("Recovery failed — please try again.");
     } finally {
       // Clear the mnemonic and password from state regardless of outcome.

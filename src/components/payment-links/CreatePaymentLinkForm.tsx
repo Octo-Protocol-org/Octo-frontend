@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useId, useState, type FormEvent } from "react";
 import { Modal } from "@/components/dashboard/Modal";
 import { ActionButton } from "@/components/dashboard/WalletUI";
@@ -41,7 +42,7 @@ export function CreatePaymentLinkForm({
       } catch (err) {
         e.target.value = "";
         setImageFile(null);
-        setError(err instanceof Error ? err.message : "Image upload failed.");
+        setError(errorMessage(err, "Image upload failed."));
         return;
       }
     }
@@ -76,7 +77,7 @@ export function CreatePaymentLinkForm({
       });
       onCreated(link);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the link.");
+      setError(errorMessage(err, "Could not create the link."));
     } finally {
       setCreating(false);
     }

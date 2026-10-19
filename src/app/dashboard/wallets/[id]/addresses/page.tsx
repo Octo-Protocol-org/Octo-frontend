@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
@@ -56,7 +57,7 @@ export default function AddressesPage({
           setError(null);
         })
         .catch((e) => {
-          setError(e instanceof Error ? e.message : "Could not load addresses.");
+          setError(errorMessage(e, "Could not load addresses."));
         })
         .finally(() => setRefreshing(false));
     },
@@ -93,7 +94,7 @@ export default function AddressesPage({
       const addr = await createAddress(token, id, customerRef);
       setAddresses((prev) => [addr, ...prev]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not generate a new address.");
+      setError(errorMessage(e, "Could not generate a new address."));
     } finally {
       setCreating(false);
     }

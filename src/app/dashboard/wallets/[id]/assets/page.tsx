@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { use, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
@@ -41,7 +42,7 @@ export default function AssetsPage({
         setError(null);
       })
       .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not load balances."),
+        setError(errorMessage(e, "Could not load balances.")),
       )
       .finally(() => setRefreshing(false));
   }
@@ -59,7 +60,7 @@ export default function AssetsPage({
         setBalances([]);
         // Without this the page shows "no assets", which looks like an empty wallet rather
         // than a failed request.
-        setError(e instanceof Error ? e.message : "Could not load balances.");
+        setError(errorMessage(e, "Could not load balances."));
       });
     return () => controller.abort();
   }, [token, id]);

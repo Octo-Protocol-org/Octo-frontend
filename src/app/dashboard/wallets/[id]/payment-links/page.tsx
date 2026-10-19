@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { payUrl } from "@/lib/format";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
@@ -66,7 +67,7 @@ export default function PaymentLinksPage({
         .catch((e) => {
           if (!opts?.silent) {
             setError(
-              e instanceof Error ? e.message : "Could not load payment links.",
+              errorMessage(e, "Could not load payment links."),
             );
           }
         })
@@ -123,7 +124,7 @@ export default function PaymentLinksPage({
       const updated = await setPaymentLinkActive(asAuthToken(token), asWalletId(id), link.id, !link.active);
       setLinks((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update the link.");
+      setError(errorMessage(e, "Could not update the link."));
     }
   }
 

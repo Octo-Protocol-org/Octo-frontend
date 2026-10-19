@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { payUrl } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
@@ -37,7 +38,7 @@ export function PaymentLinkDetail({
       })
       .catch((e) =>
         setPaymentsError(
-          e instanceof Error ? e.message : "Could not load payments.",
+          errorMessage(e, "Could not load payments."),
         ),
       );
   }, [token, walletId, link.id]);
@@ -53,7 +54,7 @@ export function PaymentLinkDetail({
       setPayments((prev) => [...(prev ?? []), ...page.data]);
       setNextCursor(page.next_cursor);
     } catch (e) {
-      setPaymentsError(e instanceof Error ? e.message : "Could not load payments.");
+      setPaymentsError(errorMessage(e, "Could not load payments."));
     } finally {
       setLoadingMore(false);
     }

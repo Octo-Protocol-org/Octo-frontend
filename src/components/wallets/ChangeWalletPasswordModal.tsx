@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/dashboard/Modal";
@@ -88,7 +89,7 @@ export function ChangeWalletPasswordModal({
           throw new Error("Decrypted key does not match this wallet.");
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Decrypted key does not match this wallet.";
+        const message = errorMessage(err, "Decrypted key does not match this wallet.");
         if (/does not match this wallet/i.test(message)) {
           throw err;
         }
@@ -141,7 +142,7 @@ export function ChangeWalletPasswordModal({
           throw new Error("Decrypted key does not match this wallet.");
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Decrypted key does not match this wallet.";
+        const message = errorMessage(err, "Decrypted key does not match this wallet.");
         if (/does not match this wallet/i.test(message)) {
           throw err;
         }
@@ -157,7 +158,7 @@ export function ChangeWalletPasswordModal({
       setDone(true);
       toast.success("Wallet password changed successfully.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change the password.");
+      setError(errorMessage(err, "Could not change the password."));
     } finally {
       // Wipe the mnemonic and passwords from memory.
       mnemonic = "";

@@ -25,7 +25,7 @@ import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
 import confetti from "canvas-confetti";
 import { formatStroops } from "@/lib/amount";
-import { ApiError } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { validateRedirectUrl } from "@/lib/redirectUrl";
@@ -334,7 +334,7 @@ export default function PayPage({
       replaceIntent(created, key);
       setStep("pay");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start this payment.");
+      setError(errorMessage(err, "Could not start this payment."));
     } finally {
       setSubmitting(false);
     }
@@ -390,7 +390,7 @@ export default function PayPage({
         friendlyResultMessage(result.detail, "The payment could not be confirmed on-chain."),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Freighter payment failed.");
+      setError(errorMessage(err, "Freighter payment failed."));
     } finally {
       setFreighterBusy(false);
     }
