@@ -9,7 +9,7 @@ export const metadata = { title: "Sign up — Octo" };
 
 export default function SignupPage() {
   return (
-    <AuthShell>
+    <AuthShell consent>
       <AuthForm mode="signup" />
     </AuthShell>
   );

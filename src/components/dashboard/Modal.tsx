@@ -1,9 +1,32 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/components/CopyButton";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+
+// Open modals, outermost first. Only the top one handles Escape and traps Tab.
+const modalStack: string[] = [];
+const stackListeners = new Set<() => void>();
+
+function notifyStack() {
+  stackListeners.forEach((listener) => listener());
+}
+
+function subscribeStack(listener: () => void) {
+  stackListeners.add(listener);
+  return () => {
+    stackListeners.delete(listener);
+  };
+}
+
+function useIsTopModal(id: string) {
+  return useSyncExternalStore(
+    subscribeStack,
+    () => modalStack[modalStack.length - 1] === id,
+    () => false,
+  );
+}
 
 export function Modal({
   title,
@@ -16,16 +39,27 @@ export function Modal({
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(panelRef);
+  const isTop = useIsTopModal(titleId);
+  useFocusTrap(panelRef, isTop);
 
-  // Escape closes, matching native dialog behaviour for keyboard users.
   useEffect(() => {
+    modalStack.push(titleId);
+    notifyStack();
+    return () => {
+      modalStack.splice(modalStack.indexOf(titleId), 1);
+      notifyStack();
+    };
+  }, [titleId]);
+
+  // Escape closes, matching native dialog behaviour for keyboard users. Only the top modal reacts.
+  useEffect(() => {
+    if (!isTop) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [isTop, onClose]);
 
   return (
     <div
