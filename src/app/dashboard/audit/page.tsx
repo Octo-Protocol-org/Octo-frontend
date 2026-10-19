@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { listAuditLogsPage, type AuditLog } from "@/lib/audit";
-import { errorMessage } from "@/lib/api";
+import { useCursorPagination } from "@/lib/useCursorPagination";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
@@ -28,61 +28,33 @@ const CATEGORY_COLOR: Record<string, string> = {
 
 export default function AuditLogsPage() {
   const { user, token, loading, logout } = useAuth();
-  const [logs, setLogs] = useState<AuditLog[] | null>(null);
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
-
-  // Cursor stack: index 0 = page 1 (no cursor), each subsequent entry is the next_cursor.
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-
-  const load = useCallback(
-    (before: string | null) => {
-      if (!token) return;
-      // Only the latest request may update state, so an older slow response is dropped.
-      const id = ++requestId.current;
-      setLogs(null);
-      setError(null);
-      listAuditLogsPage(token, { category, search, before })
-        .then((page) => {
-          if (id !== requestId.current) return;
-          setLogs(page.data);
-          setNextCursor(page.next_cursor);
-        })
-        .catch((err) => {
-          if (id !== requestId.current) return;
-          setError(errorMessage(err, "Failed to load audit logs."));
-          setLogs([]);
-        });
-    },
-    [token, category, search],
-  );
-
+  // The search waits 350 ms after typing, and applies at once when cleared.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    // Reset to page 1 whenever filters change.
-    setCursors([null]);
-    setPageIndex(0);
-    setNextCursor(null);
-    const t = setTimeout(() => load(null), search ? 350 : 0);
+    const t = setTimeout(() => setDebouncedSearch(search), search ? 350 : 0);
     return () => clearTimeout(t);
-  }, [load, search]);
+  }, [search]);
 
-  function goNext() {
-    if (!nextCursor) return;
-    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
-    setPageIndex((i) => i + 1);
-    load(nextCursor);
-  }
-
-  function goPrev() {
-    if (pageIndex === 0) return;
-    const target = cursors[pageIndex - 1];
-    setPageIndex((i) => i - 1);
-    load(target ?? null);
-  }
+  const {
+    rows,
+    loaded,
+    loading: logsLoading,
+    error,
+    page,
+    hasPrev,
+    hasNext,
+    next,
+    prev,
+  } = useCursorPagination(
+    (before) => listAuditLogsPage(token ?? "", { category, search: debouncedSearch, before }),
+    [category, debouncedSearch],
+    "Failed to load audit logs.",
+    Boolean(token),
+  );
+  // Null while loading, empty after an error, so the list shows the same states as before.
+  const logs = loaded && !logsLoading ? (error ? [] : rows) : null;
 
   if (loading || !user) {
     return (
@@ -178,12 +150,12 @@ export default function AuditLogsPage() {
         </div>
 
         <Pagination
-          page={pageIndex + 1}
-          hasPrev={pageIndex > 0}
-          hasNext={nextCursor !== null}
+          page={page}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
           loading={logs === null}
-          onPrev={goPrev}
-          onNext={goNext}
+          onPrev={prev}
+          onNext={next}
         />
 
         {logs && logs.length > 0 && (

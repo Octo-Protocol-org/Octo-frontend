@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { createGasTank } from "@/lib/wallets";
 import { getGasTank, type GasTankStatus } from "@/lib/gasTankApi";
 
@@ -25,7 +25,7 @@ export function GasTankProvision({ token, walletId }: { token: string; walletId:
         if (!active) return;
         // Only a 404 means no tank; any other failure must not offer to create one.
         if (err instanceof ApiError && err.status === 404) setStatus(null);
-        else setLoadError(err instanceof Error ? err.message : "Could not load gas tank.");
+        else setLoadError(errorMessage(err, "Could not load gas tank."));
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -40,7 +40,7 @@ export function GasTankProvision({ token, walletId }: { token: string; walletId:
       setStatus({ gas_tank_address: res.gas_tank_address, funded: res.funded });
       toast.success("Gas tank created.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to create gas tank.");
+      toast.error(errorMessage(err, "Failed to create gas tank."));
     } finally {
       setCreating(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { useCursorPagination } from "@/lib/useCursorPagination";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { displayName } from "@/lib/auth";
@@ -23,80 +24,50 @@ const SPONSORSHIP_CONCURRENCY = 5;
 
 export default function DashboardHome() {
   const { user, token, loading, logout } = useAuth();
-  const [wallets, setWallets] = useState<WalletView[] | null>(null);
   const [sponsorshipByWalletId, setSponsorshipByWalletId] = useState<
     Map<string, SponsorshipConfig | null>
   >(new Map());
 
-  // Cursor stack for wallet pagination.
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingPage, setLoadingPage] = useState(false);
-  const cancelPrevLoad = useRef<(() => void) | null>(null);
-  const [loadError, setLoadError] = useState(false);
-
-  const loadPage = useCallback(
-    (before: string | null) => {
-      if (!token) return;
-      let aborted = false;
-      // Cancel the previous request so a slow older page can't overwrite the current one.
-      cancelPrevLoad.current?.();
-      cancelPrevLoad.current = () => { aborted = true; };
-      setLoadingPage(true);
-      setWallets(null);
-      setLoadError(false);
-      listWalletsPage(token, { before })
-        .then(async (page) => {
-          if (aborted) return;
-          setWallets(page.data);
-          setNextCursor(page.next_cursor);
-          // Fetch sponsorship configs for the visible page in parallel.
-          const results: PromiseSettledResult<SponsorshipConfig>[] = [];
-          for (let i = 0; i < page.data.length; i += SPONSORSHIP_CONCURRENCY) {
-            const batch = page.data.slice(i, i + SPONSORSHIP_CONCURRENCY);
-            results.push(
-              ...(await Promise.allSettled(
-                batch.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
-              )),
-            );
-          }
-          if (aborted) return;
-          const map = new Map<string, SponsorshipConfig | null>();
-          page.data.forEach((w, i) => {
-            const r = results[i];
-            map.set(w.id, r?.status === "fulfilled" ? r.value : null);
-          });
-          setSponsorshipByWalletId(map);
-        })
-        .catch(() => {
-          if (!aborted) setLoadError(true);
-        })
-        .finally(() => {
-          if (!aborted) setLoadingPage(false);
-        });
-      return () => { aborted = true; };
+  const {
+    rows: pageWallets,
+    loaded,
+    loading: loadingPage,
+    error: loadErrorMessage,
+    page,
+    hasPrev,
+    hasNext,
+    refresh,
+    next,
+    prev,
+  } = useCursorPagination(
+    async (before) => {
+      const result = await listWalletsPage(token ?? "", { before });
+      // Fetch sponsorship configs for the visible page in batches.
+      const results: PromiseSettledResult<SponsorshipConfig>[] = [];
+      for (let i = 0; i < result.data.length; i += SPONSORSHIP_CONCURRENCY) {
+        const batch = result.data.slice(i, i + SPONSORSHIP_CONCURRENCY);
+        results.push(
+          ...(await Promise.allSettled(
+            batch.map((w) => getSponsorshipConfig(asAuthToken(token ?? ""), asWalletId(w.id))),
+          )),
+        );
+      }
+      const map = new Map<string, SponsorshipConfig | null>();
+      result.data.forEach((w, i) => {
+        const r = results[i];
+        map.set(w.id, r?.status === "fulfilled" ? r.value : null);
+      });
+      setSponsorshipByWalletId(map);
+      return result;
     },
     [token],
+    "Could not load your wallets.",
+    Boolean(token),
   );
 
-  useEffect(() => {
-    loadPage(null);
-  }, [loadPage]);
-
-  function goNext() {
-    if (!nextCursor) return;
-    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
-    setPageIndex((i) => i + 1);
-    loadPage(nextCursor);
-  }
-
-  function goPrev() {
-    if (pageIndex === 0) return;
-    const target = cursors[pageIndex - 1];
-    setPageIndex((i) => i - 1);
-    loadPage(target ?? null);
-  }
+  const loadError = loadErrorMessage !== null;
+  // Null while a page loads or before the first one arrives, so the list shows its skeleton.
+  const wallets = loaded && !loadingPage ? pageWallets : null;
 
   if (loading || !user) {
     return (
@@ -155,7 +126,7 @@ export default function DashboardHome() {
           {loadError ? (
             <ErrorState
               message="Could not load your wallets."
-              onRetry={() => loadPage(cursors[pageIndex] ?? null)}
+              onRetry={refresh}
             />
           ) : wallets === null ? (
             <p className="text-sm text-muted">Loading wallets&#x2026;</p>
@@ -173,12 +144,12 @@ export default function DashboardHome() {
             </div>
           )}
           <Pagination
-            page={pageIndex + 1}
-            hasPrev={pageIndex > 0}
-            hasNext={nextCursor !== null}
+            page={page}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
             loading={loadingPage}
-            onPrev={goPrev}
-            onNext={goNext}
+            onPrev={prev}
+            onNext={next}
           />
         </div>
       </div>

@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/api";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
@@ -30,7 +31,7 @@ export default function EditPaymentLinkPage({
     if (!token) return;
     getPaymentLink(asAuthToken(token), asWalletId(id), linkId)
       .then(setLink)
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load the link."));
+      .catch((e) => setError(errorMessage(e, "Could not load the link.")));
   }, [token, id, linkId]);
 
   if (loading || !user) return <PageSpinner />;

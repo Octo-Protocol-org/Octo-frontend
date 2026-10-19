@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCountdownMs } from "@/lib/format";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { CopyButton } from "@/components/CopyButton";
@@ -24,7 +25,7 @@ import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
 import confetti from "canvas-confetti";
 import { formatStroops } from "@/lib/amount";
-import { ApiError } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { validateRedirectUrl } from "@/lib/redirectUrl";
@@ -53,15 +54,6 @@ function intentInputsKey(amountUsdcStroops: number, name: string, email: string)
 }
 
 // Formats a millisecond countdown as m:ss (or h:mm:ss past an hour) for the payer.
-function formatCountdown(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
 function celebrate() {
   confetti({ 
     particleCount: 140, 
@@ -347,7 +339,7 @@ export default function PayPage({
       replaceIntent(created, key);
       setStep("pay");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start this payment.");
+      setError(errorMessage(err, "Could not start this payment."));
     } finally {
       setSubmitting(false);
     }
@@ -403,7 +395,7 @@ export default function PayPage({
         friendlyResultMessage(result.detail, "The payment could not be confirmed on-chain."),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Freighter payment failed.");
+      setError(errorMessage(err, "Freighter payment failed."));
     } finally {
       setFreighterBusy(false);
     }
@@ -588,8 +580,8 @@ export default function PayPage({
                   }`}
                 >
                   {remainingMs <= EXPIRY_WARNING_MS
-                    ? `⚠️ Less than ${formatCountdown(remainingMs)} left — complete your payment now or it will expire.`
-                    : `⏳ Time remaining to pay: ${formatCountdown(remainingMs)}`}
+                    ? `⚠️ Less than ${formatCountdownMs(remainingMs)} left — complete your payment now or it will expire.`
+                    : `⏳ Time remaining to pay: ${formatCountdownMs(remainingMs)}`}
                 </div>
               )}
 

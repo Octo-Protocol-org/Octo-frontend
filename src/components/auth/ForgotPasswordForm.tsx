@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ApiError } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { requestPasswordReset, resetPassword, MIN_ACCOUNT_PASSWORD_LENGTH } from "@/lib/passwordApi";
 import { assessPassword, MIN_PASSWORD_SCORE } from "@/lib/passwordStrength";
 import { PasswordStrengthMeter } from "@/lib/passwordStrength";
@@ -40,7 +40,7 @@ export function ForgotPasswordForm() {
     } catch (err) {
       // Only surface non-client errors so the flow never reveals whether the email is registered.
       if (!(err instanceof ApiError) || err.status >= 500) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(errorMessage(err, "Something went wrong."));
         setBusy(false);
         return;
       }
@@ -66,7 +66,7 @@ export function ForgotPasswordForm() {
       await requestPasswordReset(email.trim());
       setCooldown(30);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not resend the code.");
+      setError(errorMessage(err, "Could not resend the code."));
     }
   }
 
@@ -90,7 +90,7 @@ export function ForgotPasswordForm() {
       await resetPassword(email.trim(), code, password);
       setStep("done");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not reset password.");
+      setError(errorMessage(err, "Could not reset password."));
       // An invalid or expired code is fixed on the code step.
       if (err instanceof ApiError && err.status < 500) setStep("code");
     } finally {

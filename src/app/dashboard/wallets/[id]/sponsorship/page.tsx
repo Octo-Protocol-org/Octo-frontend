@@ -12,7 +12,7 @@ import {
 } from "@/lib/sponsorship";
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { formatStroops } from "@/lib/amount";
 import { BudgetMeter } from "@/components/sponsorship/BudgetMeter";
@@ -60,7 +60,7 @@ export default function SponsorshipSettingsPage({
       .catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         // Surface the failure so the user knows the config didn't load.
-        setError(e instanceof Error ? e.message : "Could not load sponsorship config.");
+        setError(errorMessage(e, "Could not load sponsorship config."));
       });
     return () => controller.abort();
   }, [token, id]);
@@ -102,7 +102,7 @@ export default function SponsorshipSettingsPage({
       toast.success("Sponsorship settings saved.");
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Failed to save settings.",
+        errorMessage(err, "Failed to save settings."),
       );
     } finally {
       setSaving(false);

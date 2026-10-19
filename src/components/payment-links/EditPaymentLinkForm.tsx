@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { useId, useState, type FormEvent } from "react";
 import { ActionButton } from "@/components/dashboard/WalletUI";
 import { asAuthToken, asWalletId } from "@/lib/brands";
@@ -46,7 +47,7 @@ export function EditPaymentLinkForm({
       } catch (err) {
         e.target.value = "";
         setImageFile(null);
-        setError(err instanceof Error ? err.message : "Image upload failed.");
+        setError(errorMessage(err, "Image upload failed."));
         return;
       }
     }
@@ -74,7 +75,7 @@ export function EditPaymentLinkForm({
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the link.");
+      setError(errorMessage(err, "Could not save the link."));
     } finally {
       setSaving(false);
     }

@@ -3,7 +3,7 @@
 import { createContext, createElement, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { ApiError } from "./api";
+import { ApiError, errorMessage } from "./api";
 import {
   getToken,
   signOut,
@@ -86,9 +86,7 @@ function useAuthSession() {
           return;
         }
         const message =
-          err instanceof Error
-            ? err.message
-            : "We could not verify your session. Check your connection and try again.";
+          errorMessage(err, "We could not verify your session. Check your connection and try again.");
         setAuthError(message);
         toast.error(message, {
           action: { label: "Retry", onClick: () => retryRef.current() },

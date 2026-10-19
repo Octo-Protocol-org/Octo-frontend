@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { changePassword, MIN_ACCOUNT_PASSWORD_LENGTH } from "@/lib/passwordApi";
 import { assessPassword, MIN_PASSWORD_SCORE } from "@/lib/passwordStrength";
 import { PasswordStrengthMeter } from "@/lib/passwordStrength";
@@ -40,7 +40,7 @@ export function ChangePasswordForm({ token }: { token: string }) {
       setConfirm("");
       toast.success("Password changed.");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to change password.");
+      setError(errorMessage(err, "Failed to change password."));
     } finally {
       setBusy(false);
     }
