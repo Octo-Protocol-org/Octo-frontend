@@ -1,5 +1,6 @@
 "use client";
 
+import { payUrl } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { formatStroops } from "@/lib/amount";
@@ -9,11 +10,6 @@ import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
 import { PayWithOctoSnippet } from "@/components/payment-links/PayWithOctoSnippet";
 import { ExportPaymentLinkPaymentsCsvButton } from "@/components/export/ExportPaymentLinkPaymentsCsvButton";
 import { PaymentsTable } from "./PaymentsTable";
-
-function payUrl(slug: string): string {
-  if (typeof window === "undefined") return `/pay/${slug}`;
-  return `${window.location.origin}/pay/${slug}`;
-}
 
 export function PaymentLinkDetail({
   link,

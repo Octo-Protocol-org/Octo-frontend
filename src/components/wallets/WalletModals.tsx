@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCountdownSeconds } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/OtpInput";
@@ -232,10 +233,6 @@ type WithdrawAsset = {
 
 /** Stop accepting the code this long before maxTime so the relay can still reach the network. */
 const EXPIRY_MARGIN_MS = 10_000;
-
-function formatCountdown(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
 
 export function WithdrawModal({
   token,
@@ -817,7 +814,7 @@ export function WithdrawModal({
           aria-live="polite"
         >
           Expires in{" "}
-          <span className="font-mono text-foreground">{formatCountdown(secondsLeft)}</span>
+          <span className="font-mono text-foreground">{formatCountdownSeconds(secondsLeft)}</span>
         </p>
 
         <div className="mt-4">

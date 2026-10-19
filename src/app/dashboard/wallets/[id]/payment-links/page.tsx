@@ -1,5 +1,6 @@
 "use client";
 
+import { payUrl } from "@/lib/format";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
@@ -23,11 +24,6 @@ import { usePolling } from "@/lib/usePolling";
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
-
-function payUrl(slug: string): string {
-  if (typeof window === "undefined") return `/pay/${slug}`;
-  return `${window.location.origin}/pay/${slug}`;
-}
 
 export default function PaymentLinksPage({
   params,

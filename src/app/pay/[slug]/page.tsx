@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCountdownMs } from "@/lib/format";
 import { use, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { CopyButton } from "@/components/CopyButton";
@@ -53,15 +54,6 @@ function intentInputsKey(amountUsdcStroops: number, name: string, email: string)
 }
 
 // Formats a millisecond countdown as m:ss (or h:mm:ss past an hour) for the payer.
-function formatCountdown(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
 function celebrate() {
   confetti({ 
     particleCount: 140, 
@@ -583,8 +575,8 @@ export default function PayPage({
                   }`}
                 >
                   {remainingMs <= EXPIRY_WARNING_MS
-                    ? `⚠️ Less than ${formatCountdown(remainingMs)} left — complete your payment now or it will expire.`
-                    : `⏳ Time remaining to pay: ${formatCountdown(remainingMs)}`}
+                    ? `⚠️ Less than ${formatCountdownMs(remainingMs)} left — complete your payment now or it will expire.`
+                    : `⏳ Time remaining to pay: ${formatCountdownMs(remainingMs)}`}
                 </div>
               )}
 
