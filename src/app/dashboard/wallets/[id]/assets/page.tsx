@@ -106,15 +106,14 @@ export default function AssetsPage({
             </div>
 
             {/* stat cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               <Stat label="Total XLM" value={xlm ? `${xlm.balance} XLM` : "0 XLM"} />
-              <Stat label="No. of assets" value={String(balances.length || (xlm ? 1 : 0))} />
+              <Stat label="No. of assets" value={String(balances.length)} />
               <Stat
                 label="Trustlines held"
                 value={String(credits.length)}
                 sub="Non-native assets"
               />
-              <Stat label="Reserve" value="1.0 XLM" sub="Base account reserve" />
             </div>
 
             <SpendableReservedBreakdown token={token} walletId={id} balances={balances} />

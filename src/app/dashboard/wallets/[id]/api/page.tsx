@@ -11,7 +11,8 @@ import {
 import { PageSpinner } from "@/components/OctoSpinner";
 import { CopyButton } from "@/components/CopyButton";
 import { Modal } from "@/components/dashboard/Modal";
-import { ApiError } from "@/lib/api";
+import { ApiError, API_URL } from "@/lib/api";
+import { Code } from "@/components/docs/DocsUI";
 import { toast } from "sonner";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
@@ -183,17 +184,12 @@ export default function DevelopersPage({
 
               {/* quickstart */}
               {keyInfo?.configured && (
-                <div className="mt-8 overflow-hidden rounded-xl border border-border bg-code-bg">
-                  <div className="border-b border-border px-4 py-2 text-xs text-muted">
-                    Quickstart — generate a deposit address
-                  </div>
-                  <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-foreground/80">
-                    <code>{`curl -X POST \\
-  ${apiBase()}/v1/wallets/${id}/addresses \\
-  -H "authorization: Bearer <YOUR_LOGIN_TOKEN>" \\
+                <div className="mt-3">
+                  <Code label="Quickstart — generate a deposit address">{`curl -X POST \\
+  ${API_URL}/v1/wallets/${id}/addresses \\
+  -H "authorization: Bearer <YOUR_API_KEY>" \\
   -H "content-type: application/json" \\
-  -d '{"customer_ref":"user_123"}'`}</code>
-                  </pre>
+  -d '{"customer_ref":"user_123"}'`}</Code>
                 </div>
               )}
             </div>
@@ -275,10 +271,6 @@ function RegenerateKeyModal({
       </form>
     </Modal>
   );
-}
-
-function apiBase() {
-  return process.env.NEXT_PUBLIC_OCTO_API_URL ?? "http://localhost:8080";
 }
 
 function maskFrom(key: string) {
