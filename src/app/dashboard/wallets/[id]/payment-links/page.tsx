@@ -2,7 +2,8 @@
 
 import { errorMessage } from "@/lib/api";
 import { payUrl } from "@/lib/format";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useState } from "react";
+import { useCursorPagination } from "@/lib/useCursorPagination";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import { PaymentLinkList } from "@/components/payment-links/PaymentLinkList";
@@ -36,81 +37,40 @@ export default function PaymentLinksPage({
 
   const { wallet } = useWallet(id);
   const [links, setLinks] = useState<PaymentLink[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<PaymentLink | null>(null);
   const [selected, setSelected] = useState<PaymentLink | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deactivating, setDeactivating] = useState<PaymentLink | null>(null);
 
-  // Cursor pagination: `cursors[i]` is the `before` cursor for page i+1 (page 1 has none).
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  // Latest non-silent request id; a response that no longer matches it is stale and dropped.
-  const latestReq = useRef(0);
-
-  const load = useCallback(
-    (before: string | null, opts?: { silent?: boolean }) => {
-      if (!token) return;
-      const reqId = opts?.silent ? latestReq.current : ++latestReq.current;
-      if (!opts?.silent) setRefreshing(true);
-      return listPaymentLinksPage(asAuthToken(token), asWalletId(id), { before })
-        .then((page) => {
-          if (reqId !== latestReq.current) return;
-          setLinks(page.data);
-          setNextCursor(page.next_cursor);
-          setError(null);
-        })
-        .catch((e) => {
-          if (!opts?.silent) {
-            setError(
-              errorMessage(e, "Could not load payment links."),
-            );
-          }
-        })
-        .finally(() => {
-          if (!opts?.silent) setRefreshing(false);
-        });
-    },
-    [token, id],
+  const {
+    rows: links,
+    setRows: setLinks,
+    page,
+    hasPrev,
+    hasNext,
+    loading: refreshing,
+    error: listError,
+    refresh,
+    refreshSilently,
+    next,
+    prev,
+  } = useCursorPagination(
+    (before) => listPaymentLinksPage(asAuthToken(token ?? ""), asWalletId(id), { before }),
+    [id, token],
+    "Could not load payment links.",
+    Boolean(token),
   );
-
-  function refresh() {
-    load(cursors[pageIndex] ?? null);
-  }
-
-  useEffect(() => {
-    if (!token) return;
-    load(null);
-  }, [token, id, load]);
+  const error = actionError ?? listError;
 
   // Silently re-fetch so a just-received payment (collected total) shows up without a manual
   // refresh. Page 1 only — refreshing a deeper page would shift rows under the user.
-  const pollFn = useCallback(
-    async () => {
-      if (!token || pageIndex !== 0) return;
-      await load(null, { silent: true });
-    },
-    [token, pageIndex, load],
-  );
+  const pollFn = useCallback(async () => {
+    if (!token || hasPrev) return;
+    await refreshSilently();
+  }, [token, hasPrev, refreshSilently]);
   usePolling(pollFn, 5000);
-
-  function goNext() {
-    if (!nextCursor) return;
-    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
-    setPageIndex((i) => i + 1);
-    load(nextCursor);
-  }
-
-  function goPrev() {
-    if (pageIndex === 0) return;
-    const target = cursors[pageIndex - 1];
-    setPageIndex((i) => i - 1);
-    load(target ?? null);
-  }
 
   // Deactivating cuts off anyone on the checkout, so it asks first. Reactivating does not.
   function requestToggle(link: PaymentLink) {
@@ -124,7 +84,7 @@ export default function PaymentLinksPage({
       const updated = await setPaymentLinkActive(asAuthToken(token), asWalletId(id), link.id, !link.active);
       setLinks((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
     } catch (e) {
-      setError(errorMessage(e, "Could not update the link."));
+      setActionError(errorMessage(e, "Could not update the link."));
     }
   }
 
@@ -213,12 +173,12 @@ export default function PaymentLinksPage({
                   </div>
                 )}
                 <Pagination
-                  page={pageIndex + 1}
-                  hasPrev={pageIndex > 0}
-                  hasNext={nextCursor !== null}
+                  page={page}
+                  hasPrev={hasPrev}
+                  hasNext={hasNext}
                   loading={refreshing}
-                  onPrev={goPrev}
-                  onNext={goNext}
+                  onPrev={prev}
+                  onNext={next}
                 />
               </Panel>
             </div>
