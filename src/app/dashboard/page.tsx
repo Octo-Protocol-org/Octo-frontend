@@ -18,6 +18,9 @@ import { ErrorState } from "@/components/dashboard/WalletUI";
 
 export const dynamic = "force-dynamic";
 
+// How many sponsorship configs to request at once for a page of wallets.
+const SPONSORSHIP_CONCURRENCY = 5;
+
 export default function DashboardHome() {
   const { user, token, loading, logout } = useAuth();
   const [wallets, setWallets] = useState<WalletView[] | null>(null);
@@ -49,9 +52,15 @@ export default function DashboardHome() {
           setWallets(page.data);
           setNextCursor(page.next_cursor);
           // Fetch sponsorship configs for the visible page in parallel.
-          const results = await Promise.allSettled(
-            page.data.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
-          );
+          const results: PromiseSettledResult<SponsorshipConfig>[] = [];
+          for (let i = 0; i < page.data.length; i += SPONSORSHIP_CONCURRENCY) {
+            const batch = page.data.slice(i, i + SPONSORSHIP_CONCURRENCY);
+            results.push(
+              ...(await Promise.allSettled(
+                batch.map((w) => getSponsorshipConfig(asAuthToken(token), asWalletId(w.id))),
+              )),
+            );
+          }
           if (aborted) return;
           const map = new Map<string, SponsorshipConfig | null>();
           page.data.forEach((w, i) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { ApiError } from "./api";
@@ -25,7 +25,7 @@ const MIN_LOADING_MS = 700;
  *  2. 401 from any apiFetch → "session-expired" CustomEvent.
  *  3. Another tab removing octo_token → storage event.
  */
-export function useAuth() {
+function useAuthSession() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -137,6 +137,26 @@ export function useAuth() {
   }
 
   return { user, token, loading, authError, retrySessionCheck, logout };
+}
+
+type AuthSession = ReturnType<typeof useAuthSession>;
+
+const AuthContext = createContext<AuthSession | null>(null);
+
+/**
+ * Runs the session check once for the dashboard. Mounted in the dashboard layout, so
+ * navigating between pages reuses the result instead of calling `me()` again.
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const session = useAuthSession();
+  return createElement(AuthContext.Provider, { value: session }, children);
+}
+
+/** The shared session from AuthProvider. Dashboard pages always render inside it. */
+export function useAuth(): AuthSession {
+  const session = useContext(AuthContext);
+  if (!session) throw new Error("useAuth must be used inside AuthProvider");
+  return session;
 }
 
 export function isAuthenticationFailure(err: unknown): boolean {

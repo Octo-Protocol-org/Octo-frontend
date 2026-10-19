@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "@/lib/useAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +15,5 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <AuthProvider>{children}</AuthProvider>;
 }

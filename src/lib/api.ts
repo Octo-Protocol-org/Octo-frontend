@@ -71,7 +71,7 @@ export async function apiFetch<T>(
       ...rest,
       signal,
       headers: {
-        "content-type": "application/json",
+        ...(rest.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...headers,
       },

@@ -33,15 +33,18 @@ const NAV: {
 export function Sidebar({
   user,
   blockNavigation,
+  className,
 }: {
   user?: User | null;
   /** Returns true to cancel a nav click (e.g. while unsaved one-time secrets are shown). */
   blockNavigation?: (href: string) => boolean;
+  /** Extra classes, e.g. to hide the sidebar on small screens. */
+  className?: string;
 }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface-sunken px-3 py-5">
+    <aside className={`flex w-64 shrink-0 flex-col border-r border-border bg-surface-sunken px-3 py-5 ${className ?? ""}`}>
       <div className="px-3">
         <Logo />
         <p className="mt-5 text-sm font-medium text-foreground">
