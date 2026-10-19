@@ -28,6 +28,7 @@ import {
   type PasswordAssessment,
 } from "@/lib/passwordStrength";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { MAX_WALLET_DESCRIPTION, MAX_WALLET_LABEL } from "@/lib/walletDetailsApi";
 import { ConfirmModal } from "@/components/dashboard/Modal";
 import { PageSpinner } from "@/components/OctoSpinner";
 
@@ -99,6 +100,15 @@ export function NewWalletClient() {
     e.preventDefault();
     if (!token) return;
     setError(null);
+
+    if (name.trim().length > MAX_WALLET_LABEL) {
+      setError(`Wallet name must be ${MAX_WALLET_LABEL} characters or fewer.`);
+      return;
+    }
+    if (description.trim().length > MAX_WALLET_DESCRIPTION) {
+      setError(`Wallet description must be ${MAX_WALLET_DESCRIPTION} characters or fewer.`);
+      return;
+    }
 
     if (!pendingCreation.current) {
       // Re-assess on submit so the decision never depends on a stale live estimate.
@@ -272,6 +282,7 @@ export function NewWalletClient() {
                   <input
                     id="wallet-name"
                     value={name}
+                    maxLength={MAX_WALLET_LABEL}
                     onChange={editField(setName)}
                     placeholder="e.g. Acme master wallet"
                     className="mt-2 w-full rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:border-burgundy-bright focus:outline-none"
@@ -288,6 +299,7 @@ export function NewWalletClient() {
                   <textarea
                     id="wallet-description"
                     value={description}
+                    maxLength={MAX_WALLET_DESCRIPTION}
                     onChange={editField(setDescription)}
                     placeholder="What is this wallet for?"
                     rows={2}

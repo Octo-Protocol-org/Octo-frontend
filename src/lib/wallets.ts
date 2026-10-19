@@ -192,13 +192,16 @@ export function createAddress(
   });
 }
 
+/** Rows shown on the wallet overview. Every overview fetch uses this one limit. */
+export const RECENT_TRANSACTIONS_LIMIT = 10;
+
 /** First page of transactions up to `limit` rows — name reflects the partial view returned. */
 export async function listRecentTransactions(
   token: string,
   id: string,
-  limitOrOptions: number | RequestOptions = 20,
+  limitOrOptions: number | RequestOptions = RECENT_TRANSACTIONS_LIMIT,
 ): Promise<Transaction[]> {
-  const limit = typeof limitOrOptions === "number" ? limitOrOptions : 20;
+  const limit = typeof limitOrOptions === "number" ? limitOrOptions : RECENT_TRANSACTIONS_LIMIT;
   const options = typeof limitOrOptions === "number" ? {} : limitOrOptions;
   const page = await apiFetch<Paginated<Transaction>>(
     path`/v1/wallets/${id}/transactions` + pageQuery({ limit }),
