@@ -105,10 +105,68 @@ describe("transaction building + signing", () => {
     });
     const tx = decodeTx(xdr, Networks.TESTNET);
     expect(tx.source).toBe(VECTOR_ACCOUNT);
+    expect(tx.networkPassphrase).toBe(info.network_passphrase);
     expect(tx.signatures.length).toBe(1);
     // The signature must verify against the wallet's public key.
     const kp = Keypair.fromPublicKey(VECTOR_ACCOUNT);
     expect(kp.verify(tx.hash(), tx.signatures[0]!.signature())).toBe(true);
+  });
+
+  it("builds a signed payment to a muxed destination", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    const destination = new MuxedAccount(
+      new Account("GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "0"),
+      "42",
+    ).accountId();
+    const xdr = buildSignedPayment(w.keypair, info, { destination, amount: "1" });
+    const tx = decodeTx(xdr, info.network_passphrase);
+    const operation = tx.operations[0]!;
+
+    expect(tx.signatures).toHaveLength(1);
+    expect(tx.networkPassphrase).toBe(info.network_passphrase);
+    expect(operation.type).toBe("payment");
+    if (operation.type !== "payment") return;
+    expect(operation.destination).toBe(destination);
+  });
+
+  it.each([
+    ["invalid destination", "not-a-stellar-address", "1"],
+    ["amount with more than seven decimals", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "1.00000001"],
+    ["zero amount", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "0"],
+    ["negative amount", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "-1"],
+  ])("buildSignedPayment rejects %s", (_reason, destination, amount) => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    expect(() => buildSignedPayment(w.keypair, info, { destination, amount })).toThrow();
+  });
+
+  it("buildSignedPayment rejects an invalid asset issuer", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    expect(() =>
+      buildSignedPayment(w.keypair, info, {
+        destination: "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX",
+        amount: "1",
+        asset: { code: "USDC", issuer: "not-a-stellar-address" },
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ["invalid destination", "not-a-stellar-address", "1"],
+    ["amount with more than seven decimals", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "1.00000001"],
+    ["zero amount", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "0"],
+    ["negative amount", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX", "-1"],
+  ])("buildUnsignedPayment rejects %s", (_reason, destination, amount) => {
+    expect(() => buildUnsignedPayment(VECTOR_ACCOUNT, info, { destination, amount })).toThrow();
+  });
+
+  it("buildUnsignedPayment rejects an invalid asset issuer", () => {
+    expect(() =>
+      buildUnsignedPayment(VECTOR_ACCOUNT, info, {
+        destination: "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX",
+        amount: "1",
+        asset: { code: "USDC", issuer: "not-a-stellar-address" },
+      }),
+    ).toThrow();
   });
 
   it("builds a signed change-trust (USDC) envelope", () => {
@@ -121,7 +179,17 @@ describe("transaction building + signing", () => {
     });
     const tx = decodeTx(xdr, Networks.TESTNET);
     expect(tx.source).toBe(VECTOR_ACCOUNT);
+    expect(tx.networkPassphrase).toBe(info.network_passphrase);
     expect(tx.signatures.length).toBe(1);
+  });
+
+  it("buildSignedChangeTrust rejects an invalid asset issuer", () => {
+    const w = fromMnemonic(VECTOR_MNEMONIC);
+    expect(() =>
+      buildSignedChangeTrust(w.keypair, info, {
+        asset: { code: "USDC", issuer: "not-a-stellar-address" },
+      }),
+    ).toThrow();
   });
 
   it("builds a signed create-account for an unfunded XLM destination", () => {
