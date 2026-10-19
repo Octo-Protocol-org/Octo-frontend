@@ -62,11 +62,26 @@ export default function WalletOverview({
   const [showTrustline, setShowTrustline] = useState(false);
   const [showRecover, setShowRecover] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [refreshingBalances, setRefreshingBalances] = useState(false);
 
   function refresh() {
     if (!token) return;
-    getBalances(token, id).then(setBalances).catch(() => {});
+    getBalances(token, id)
+      .then(setBalances)
+      .catch((e) => toast.error(errorMessage(e, "Could not refresh balances.")));
     listRecentTransactions(token, id).then(setTxns).catch(() => {});
+  }
+
+  async function refreshBalances() {
+    if (!token) return;
+    setRefreshingBalances(true);
+    try {
+      setBalances(await getBalances(token, id));
+    } catch (e) {
+      toast.error(errorMessage(e, "Could not refresh balances."));
+    } finally {
+      setRefreshingBalances(false);
+    }
   }
 
   useEffect(() => {
@@ -230,8 +245,9 @@ export default function WalletOverview({
                 disabled={hasUsdc}
               />
               <ActionButton
-                label="Refresh balances"
-                onClick={() => token && getBalances(token, id).then(setBalances)}
+                label={refreshingBalances ? "Refreshing…" : "Refresh balances"}
+                onClick={refreshBalances}
+                disabled={refreshingBalances}
               />
               <ActionButton label="Recover wallet" onClick={() => setShowRecover(true)} />
               <ActionButton label="Change wallet password" onClick={() => setShowChangePassword(true)} />
