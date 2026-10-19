@@ -5,6 +5,7 @@
 import { apiFetch, path } from "./api";
 import { parseAmount, toApiStroops } from "./amount";
 import { pageQuery, type Paginated, type PageOpts } from "./pagination";
+import { fetchAllPages } from "./csv";
 import { network } from "./network";
 export { usdcForNetwork } from "./network";
 
@@ -153,15 +154,8 @@ export function listWalletsPage(
 }
 
 /** Fetch every wallet by walking all cursor pages. */
-export async function listAllWallets(token: string): Promise<WalletView[]> {
-  const all: WalletView[] = [];
-  let cursor: string | null = null;
-  do {
-    const page = await listWalletsPage(token, { before: cursor });
-    all.push(...page.data);
-    cursor = page.next_cursor;
-  } while (cursor);
-  return all;
+export function listAllWallets(token: string): Promise<WalletView[]> {
+  return fetchAllPages((before) => listWalletsPage(token, { before }));
 }
 
 export function getWallet(token: string, id: string, options: RequestOptions = {}) {
@@ -240,7 +234,7 @@ export function listAddressesPage(
   );
 }
 
-/** Lists all wallet addresses across cursor-paginated API responses. */
+/** Lists the first page of wallet addresses. Use `listAddressesPage` to page forward. */
 export async function listAddresses(
   token: string,
   id: string,
@@ -253,7 +247,7 @@ export async function listAddresses(
   return page.data;
 }
 
-/** Lists all wallet transactions across cursor-paginated API responses. */
+/** Lists the first page of wallet transactions. Use `listTransactionsPage` to page forward. */
 export async function listTransactions(
   token: string,
   id: string,

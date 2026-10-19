@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { getBackup, loadLocalBackup, parseBackup, saveLocalBackup, decryptSeed, fromMnemonic } from "@/lib/sdk";
+import { downloadBlob } from "@/lib/csv";
 
 /** Export the encrypted backup as a .json file, or re-import one into this browser. */
 export function DownloadBackupButton({
@@ -29,14 +30,10 @@ export function DownloadBackupButton({
         backup = parseBackup(remote.encrypted_backup);
       }
       const file = { wallet_id: walletId, address, backup };
-      const url = URL.createObjectURL(
+      downloadBlob(
+        `octo-backup-${(address ?? walletId).slice(0, 8)}.json`,
         new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }),
       );
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `octo-backup-${(address ?? walletId).slice(0, 8)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not download the backup.");
     } finally {

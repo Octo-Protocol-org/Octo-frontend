@@ -3,14 +3,20 @@
 import { ExportCsvButton } from "./ExportCsvButton";
 import { fetchAllPages, type CsvColumn } from "@/lib/csv";
 import { formatStroops } from "@/lib/amount";
-import { listRecentAddresses, listTransactionsPage, type Transaction } from "@/lib/wallets";
+import {
+  displayAssetCode,
+  listAddressesPage,
+  listTransactionsPage,
+  type Transaction,
+} from "@/lib/wallets";
 
 type Row = Transaction & { customerRef: string | null };
 
 const columns: CsvColumn<Row>[] = [
   { header: "Date", value: (t) => t.created_at },
   { header: "Direction", value: (t) => t.direction },
-  { header: "Asset", value: (t) => t.asset_code },
+  { header: "Asset", value: (t) => displayAssetCode(t.asset_code) },
+  { header: "Asset issuer", value: (t) => t.asset_issuer },
   { header: "Amount", value: (t) => formatStroops(t.amount_stroops) },
   { header: "Status", value: (t) => t.status },
   { header: "Hash", value: (t) => t.stellar_tx_hash },
@@ -33,8 +39,7 @@ export function ExportTransactionsCsvButton({
     if (!token) throw new Error("Not signed in.");
     const [rows, addrs] = await Promise.all([
       fetchAllPages((before) => listTransactionsPage(token, walletId, { before, limit: 200 })),
-      // Fetch up to 200 addresses for customer-ref enrichment; a failed lookup only blanks that column.
-      listRecentAddresses(token, walletId, 200).catch(() => []),
+      fetchAllPages((before) => listAddressesPage(token, walletId, { before, limit: 200 })),
     ]);
     const refs = new Map<string, string>();
     for (const a of addrs) if (a.customer_ref) refs.set(a.id, a.customer_ref);
