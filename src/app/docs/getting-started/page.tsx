@@ -117,21 +117,17 @@ X-Octo-Signature: <hmac-sha256 hex>
           </p>
         </Step>
 
-        <Step n={5} title="Pay out (withdraw)">
+        <Step n={5} title="Pay out (non-custodial)">
           <p>
-            To send funds out of the master wallet, call withdraw. For safety,
-            withdrawals require a <strong>dashboard login token</strong>, not an
-            API key. An <code>Idempotency-Key</code> makes retries safe.
+            Funds leave the wallet only when the owner signs the payment, so the server never
+            holds a key that can move them. Read the signing info, build and sign the
+            transaction in your client, request a one-time code, then confirm. The full
+            sequence is on the <Link href="/docs/api/withdrawals">Withdrawals</Link> page.
           </p>
-          <Code label="cURL">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/withdraw \\
-  -H "authorization: Bearer <LOGIN_TOKEN>" \\
-  -H "Idempotency-Key: payout-9f3c" \\
-  -H "content-type: application/json" \\
-  -d '{ "destination": "G…DEST", "amount_stroops": 10000000 }'`}</Code>
+          <Code label="cURL">{`curl ${API_URL}/v1/wallets/<WALLET_ID>/signing-info \\
+  -H "authorization: Bearer <LOGIN_TOKEN>"`}</Code>
           <Callout type="warning">
-            Amounts are integer <strong>stroops</strong> (1 XLM = 10,000,000
-            stroops). Reusing an <code>Idempotency-Key</code> returns the
-            original result instead of paying twice.
+            Amounts are integer <strong>stroops</strong> (1 XLM = 10,000,000 stroops).
           </Callout>
         </Step>
       </div>
