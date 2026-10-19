@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { displayName } from "@/lib/auth";
@@ -302,11 +302,28 @@ function WalletCard({
 
 function ManageMenu({ walletId }: { walletId: string }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open) close();
+      }}
+    >
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={menuId}
         className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:border-border-strong"
       >
         Manage <span className="text-muted">⋮</span>
@@ -314,12 +331,16 @@ function ManageMenu({ walletId }: { walletId: string }) {
 
       {open && (
         <>
-          {/* click-away */}
+          {/* click-away for mouse users; Escape covers keyboard users */}
           <div
+            aria-hidden="true"
             className="fixed inset-0 z-10"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-popover backdrop-blur-md">
+          <div
+            id={menuId}
+            className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-popover backdrop-blur-md"
+          >
             <Link
               href={`/dashboard/wallets/${walletId}`}
               className="flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-hover"

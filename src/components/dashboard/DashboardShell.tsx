@@ -48,8 +48,9 @@ export function DashboardShell({
                 onClick={onLogout}
                 className="text-sm text-muted transition-colors hover:text-foreground"
                 title="Log out"
+                aria-label="Log out"
               >
-                ⏻
+                <span aria-hidden="true">⏻</span>
               </button>
             </div>
           </header>

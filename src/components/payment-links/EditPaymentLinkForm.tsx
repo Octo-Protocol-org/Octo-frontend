@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { ActionButton } from "@/components/dashboard/WalletUI";
 import { asAuthToken, asWalletId } from "@/lib/brands";
 import { formatStroops } from "@/lib/amount";
@@ -34,6 +34,7 @@ export function EditPaymentLinkForm({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formId = useId();
 
   // Only checks the picked file. It uploads when the form is saved.
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -82,7 +83,7 @@ export function EditPaymentLinkForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-foreground">Image (optional)</label>
+        <label htmlFor={`${formId}-image`} className="text-sm font-medium text-foreground">Image (optional)</label>
         <div className="mt-1 flex items-center gap-3">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-sunken">
             {isTrustedImageUrl(imageUrl) ? (
@@ -94,6 +95,7 @@ export function EditPaymentLinkForm({
           </div>
           <div className="flex-1">
             <input
+              id={`${formId}-image`}
               type="file"
               accept={ALLOWED_IMAGE_TYPES.join(",")}
               onChange={handleImageChange}
@@ -115,12 +117,13 @@ export function EditPaymentLinkForm({
         </div>
       </div>
       <div>
-        <label className="text-sm font-medium text-foreground">Name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+        <label htmlFor={`${formId}-name`} className="text-sm font-medium text-foreground">Name</label>
+        <input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
       </div>
       <div>
-        <label className="text-sm font-medium text-foreground">Description (optional)</label>
+        <label htmlFor={`${formId}-description`} className="text-sm font-medium text-foreground">Description (optional)</label>
         <textarea
+          id={`${formId}-description`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
@@ -128,8 +131,9 @@ export function EditPaymentLinkForm({
         />
       </div>
       <div>
-        <label className="text-sm font-medium text-foreground">Amount (USD)</label>
+        <label htmlFor={`${formId}-amount`} className="text-sm font-medium text-foreground">Amount (USD)</label>
         <input
+          id={`${formId}-amount`}
           value={link.amount_usdc_stroops !== null ? formatStroops(link.amount_usdc_stroops) : "Flexible"}
           disabled
           className={`${inputCls} opacity-60`}
@@ -139,8 +143,9 @@ export function EditPaymentLinkForm({
         </p>
       </div>
       <div>
-        <label className="text-sm font-medium text-foreground">Redirect URL (optional)</label>
+        <label htmlFor={`${formId}-redirect`} className="text-sm font-medium text-foreground">Redirect URL (optional)</label>
         <input
+          id={`${formId}-redirect`}
           value={redirectUrl}
           onChange={(e) => setRedirectUrl(e.target.value)}
           placeholder="https://your-site.com/thank-you"

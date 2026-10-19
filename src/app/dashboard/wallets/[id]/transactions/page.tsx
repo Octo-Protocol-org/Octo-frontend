@@ -190,10 +190,16 @@ export default function TransactionsPage({
 
             <div className="flex items-center justify-between">
               {/* asset filter tabs */}
-              <div className="flex gap-1 rounded-lg border border-border bg-surface-raised p-1">
+              <div
+                role="group"
+                aria-label="Filter by asset"
+                className="flex gap-1 rounded-lg border border-border bg-surface-raised p-1"
+              >
                 {assetTabs.map((key) => (
                   <button
                     key={key}
+                    type="button"
+                    aria-pressed={assetFilter === key}
                     onClick={() => setAssetFilter(key)}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                       assetFilter === key

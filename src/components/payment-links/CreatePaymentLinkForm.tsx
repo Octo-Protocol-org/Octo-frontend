@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Modal } from "@/components/dashboard/Modal";
 import { ActionButton } from "@/components/dashboard/WalletUI";
 import { ALLOWED_IMAGE_HINT, ALLOWED_IMAGE_TYPES, uploadImage, validateImage } from "@/lib/uploads";
@@ -29,6 +29,7 @@ export function CreatePaymentLinkForm({
   const [redirectUrl, setRedirectUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const formId = useId();
 
   // Only checks the picked file. Nothing is uploaded until the link is created.
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -85,7 +86,7 @@ export function CreatePaymentLinkForm({
     <Modal title="Create payment link" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-sm font-medium text-foreground">
+          <label htmlFor={`${formId}-image`} className="text-sm font-medium text-foreground">
             Image (optional)
           </label>
           <div className="mt-1 flex items-center gap-3">
@@ -96,6 +97,7 @@ export function CreatePaymentLinkForm({
             </div>
             <div className="flex-1">
               <input
+                id={`${formId}-image`}
                 type="file"
                 accept={ALLOWED_IMAGE_TYPES.join(",")}
                 onChange={handleImageChange}
@@ -110,8 +112,9 @@ export function CreatePaymentLinkForm({
           </div>
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">Name</label>
+          <label htmlFor={`${formId}-name`} className="text-sm font-medium text-foreground">Name</label>
           <input
+            id={`${formId}-name`}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Product payment"
@@ -119,10 +122,11 @@ export function CreatePaymentLinkForm({
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">
+          <label htmlFor={`${formId}-description`} className="text-sm font-medium text-foreground">
             Description (optional)
           </label>
           <textarea
+            id={`${formId}-description`}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description of this payment link"
@@ -131,8 +135,9 @@ export function CreatePaymentLinkForm({
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">Amount (USD)</label>
+          <label htmlFor={`${formId}-amount`} className="text-sm font-medium text-foreground">Amount (USD)</label>
           <input
+            id={`${formId}-amount`}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Leave empty for flexible amount"
@@ -143,10 +148,11 @@ export function CreatePaymentLinkForm({
           </p>
         </div>
         <div>
-          <label className="text-sm font-medium text-foreground">
+          <label htmlFor={`${formId}-redirect`} className="text-sm font-medium text-foreground">
             Redirect URL (optional)
           </label>
           <input
+            id={`${formId}-redirect`}
             value={redirectUrl}
             onChange={(e) => setRedirectUrl(e.target.value)}
             placeholder="https://your-site.com/thank-you"
