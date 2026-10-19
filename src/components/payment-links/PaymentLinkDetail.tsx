@@ -28,12 +28,15 @@ export function PaymentLinkDetail({
 }) {
   const [payments, setPayments] = useState<PaymentLinkPayment[] | null>(null);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     listPaymentLinkPayments(asAuthToken(token), asWalletId(walletId), link.id, { limit: 20 })
       .then((page) => {
         setPayments(page.data);
+        setNextCursor(page.next_cursor);
         setPaymentsError(null);
       })
       .catch((e) =>
@@ -42,6 +45,23 @@ export function PaymentLinkDetail({
         ),
       );
   }, [token, walletId, link.id]);
+
+  async function loadMore() {
+    if (!token || !nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await listPaymentLinkPayments(asAuthToken(token), asWalletId(walletId), link.id, {
+        limit: 20,
+        before: nextCursor,
+      });
+      setPayments((prev) => [...(prev ?? []), ...page.data]);
+      setNextCursor(page.next_cursor);
+    } catch (e) {
+      setPaymentsError(e instanceof Error ? e.message : "Could not load payments.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <Modal title="Payment link details" onClose={onClose}>
@@ -90,6 +110,16 @@ export function PaymentLinkDetail({
             <ExportPaymentLinkPaymentsCsvButton token={token} walletId={walletId} linkId={link.id} />
           </div>
           <PaymentsTable payments={payments} error={paymentsError} />
+          {nextCursor && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mt-2 w-full rounded-lg border border-border py-2 text-xs font-medium text-foreground hover:bg-surface-sunken disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          )}
         </div>
       </div>
     </Modal>

@@ -218,7 +218,14 @@ function AddressRow({
   return (
     <tr
       onClick={onSelect}
-      className="cursor-pointer transition-colors hover:bg-surface-raised"
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
+      className="cursor-pointer transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-burgundy-bright"
     >
       <td className="py-3 pr-4 text-foreground">
         {address.customer_ref ?? <span className="text-muted">—</span>}
