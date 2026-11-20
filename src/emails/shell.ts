@@ -10,9 +10,11 @@ const BURGUNDY = "#7b1733";
 const BURGUNDY_BRIGHT = "#b81f4d";
 const INK = "#0a0506";
 
+import { ASSET_BASE } from "./config";
+
 const LOGO_URL =
   "https://res.cloudinary.com/h9jpvcxe/image/upload/v1786115234/octopus_burgundy_black_bg_wrx0sf.png";
-const ICON_BASE = "https://octohq.org/email";
+const ICON_BASE = ASSET_BASE;
 
 const ICON_URLS: Record<string, string> = {
   key: `${ICON_BASE}/icon-key.png`,
@@ -60,3 +62,13 @@ ${SOCIALS}
 }
 
 export { BURGUNDY, BURGUNDY_BRIGHT };
+
+/** Escapes HTML-significant characters so interpolated values render inert. */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

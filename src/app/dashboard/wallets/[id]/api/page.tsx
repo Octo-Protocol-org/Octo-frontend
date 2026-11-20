@@ -1,19 +1,22 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { useWallet } from "@/lib/useWallet";
 import {
-  getWallet,
   getApiKey,
   generateApiKey,
-  type WalletView,
   type ApiKeyInfo,
 } from "@/lib/wallets";
-import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
-import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { CopyButton } from "@/components/CopyButton";
+import { Modal } from "@/components/dashboard/Modal";
+import { API_URL, errorMessage } from "@/lib/api";
+import { Code } from "@/components/docs/DocsUI";
+import { toast } from "sonner";
+
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
+export const dynamic = "force-dynamic";
 
 export default function DevelopersPage({
   params,
@@ -21,36 +24,48 @@ export default function DevelopersPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading } = useAuth();
 
-  const [wallet, setWallet] = useState<WalletView | null>(null);
+  const { wallet } = useWallet(id);
   const [keyInfo, setKeyInfo] = useState<ApiKeyInfo | null>(null);
   const [fullKey, setFullKey] = useState<string | null>(null); // shown once after generate
   const [revealed, setRevealed] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [confirmingRegen, setConfirmingRegen] = useState(false);
+  const [keyLoadFailed, setKeyLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => {});
-    getApiKey(token, id).then(setKeyInfo).catch(() => {});
+    const controller = new AbortController();
+    getApiKey(token, id, { signal: controller.signal })
+      .then(setKeyInfo)
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setKeyLoadFailed(true);
+      });
+    return () => controller.abort();
   }, [token, id]);
 
-  async function onGenerate() {
+  // Until key status is known we can't tell "generate" from "regenerate", so block the action.
+  function onGenerateClick() {
+    if (!keyInfo || generating) return;
+    if (keyInfo.configured) setConfirmingRegen(true);
+    else void generate();
+  }
+
+  async function generate() {
     if (!token) return;
-    if (
-      keyInfo?.configured &&
-      !confirm(
-        "Regenerating will invalidate the current API key. Continue?",
-      )
-    ) {
-      return;
-    }
+    setConfirmingRegen(false);
     setGenerating(true);
     try {
       const res = await generateApiKey(token, id);
       setFullKey(res.api_key);
-      setRevealed(true);
+      setRevealed(false);
       setKeyInfo({ wallet_id: id, configured: true, prefix: res.prefix });
+    } catch (err) {
+      toast.error(
+        errorMessage(err, "Failed to generate API key."),
+      );
     } finally {
       setGenerating(false);
     }
@@ -72,30 +87,13 @@ export default function DevelopersPage({
       : "Not generated";
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
-      <DashboardBackground />
+    <>
+    <WalletPageShell
+      walletId={id}
+      walletName={wallet?.label ?? "Master wallet"}
+      section="Developers"
+    >
 
-      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
-        You are currently on <strong>test mode</strong> (Stellar testnet).
-      </div>
-      <div className="relative z-10 flex flex-1">
-        <WalletSidebar walletId={id} walletName={wallet?.label ?? "Master wallet"} />
-
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border px-8 py-4">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Link href="/dashboard" className="hover:text-foreground">
-                My Wallets
-              </Link>
-              <span>›</span>
-              <span className="text-foreground">Developers</span>
-            </div>
-            <button onClick={logout} className="text-sm text-muted hover:text-foreground">
-              ⏻
-            </button>
-          </header>
-
-          <main className="flex-1 px-8 py-8">
             <div className="mx-auto max-w-4xl">
               {/* title + actions */}
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -105,7 +103,8 @@ export default function DevelopersPage({
                 <div className="flex flex-wrap items-center gap-2">
                   <ActionBtn
                     label={generating ? "Generating…" : keyInfo?.configured ? "Regenerate API Key" : "Generate API Key"}
-                    onClick={onGenerate}
+                    onClick={onGenerateClick}
+                    disabled={!keyInfo || generating}
                     primary
                   />
                   <span className="flex items-center gap-2 text-sm text-muted">
@@ -117,12 +116,31 @@ export default function DevelopersPage({
                 </div>
               </div>
 
+              {keyLoadFailed && (
+                <div role="alert" className="mt-6 rounded-xl border border-burgundy/40 bg-burgundy/10 p-4 text-sm text-burgundy-bright">
+                  Couldn&apos;t load this wallet&apos;s API key status. Refresh the page to
+                  try again.
+                </div>
+              )}
+
               {/* one-time key banner */}
               {fullKey && (
                 <div className="mt-6 rounded-xl border border-burgundy/40 bg-burgundy/10 p-4 text-sm text-burgundy-bright">
-                  This is your API key — copy it now. It won&apos;t be shown
-                  again. Store it securely and never commit it to source
-                  control.
+                  <p>
+                    This is your API key — copy it now. It won&apos;t be shown
+                    again. Store it securely and never commit it to source
+                    control.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFullKey(null);
+                      setRevealed(false);
+                    }}
+                    className="mt-3 rounded-lg border border-burgundy/40 px-3 py-1.5 text-xs font-medium hover:bg-burgundy/10"
+                  >
+                    I&apos;ve saved the key
+                  </button>
                 </div>
               )}
 
@@ -148,54 +166,111 @@ export default function DevelopersPage({
                     {fullKey && (
                       <>
                         <button
+                          type="button"
                           onClick={() => setRevealed((v) => !v)}
                           className="text-muted hover:text-foreground"
                           title={revealed ? "Hide" : "Reveal"}
+                          aria-label={revealed ? "Hide API key" : "Reveal API key"}
                         >
                           {revealed ? "🙈" : "👁"}
                         </button>
-                        <CopyButton value={fullKey} />
+                        <CopyButton value={fullKey} sensitive />
                       </>
                     )}
                   </div>
                 </Row>
 
-                <Row label="Webhook URLs">
-                  <span className="text-sm text-muted">
-                    {wallet ? "Configure on the Webhooks tab" : "No webhooks configured"}
-                  </span>
-                </Row>
-
-                <Row label="Whitelisted IPs">
-                  <span className="text-sm text-muted">No IPs whitelisted</span>
-                </Row>
               </div>
 
               {/* quickstart */}
               {keyInfo?.configured && (
-                <div className="mt-8 overflow-hidden rounded-xl border border-border bg-code-bg">
-                  <div className="border-b border-border px-4 py-2 text-xs text-muted">
-                    Quickstart — generate a deposit address
-                  </div>
-                  <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-foreground/80">
-                    <code>{`curl -X POST \\
-  ${apiBase()}/v1/wallets/${id}/addresses \\
-  -H "authorization: Bearer <YOUR_LOGIN_TOKEN>" \\
+                <div className="mt-3">
+                  <Code label="Quickstart — generate a deposit address">{`curl -X POST \\
+  ${API_URL}/v1/wallets/${id}/addresses \\
+  -H "authorization: Bearer <YOUR_API_KEY>" \\
   -H "content-type: application/json" \\
-  -d '{"customer_ref":"user_123"}'`}</code>
-                  </pre>
+  -d '{"customer_ref":"user_123"}'`}</Code>
                 </div>
               )}
             </div>
-          </main>
-        </div>
-      </div>
-    </div>
+
+    </WalletPageShell>
+
+      {confirmingRegen && (
+        <RegenerateKeyModal
+          walletName={wallet?.label?.trim() || "regenerate"}
+          onConfirm={generate}
+          onClose={() => setConfirmingRegen(false)}
+        />
+      )}
+  </>
   );
 }
 
-function apiBase() {
-  return process.env.NEXT_PUBLIC_OCTO_API_URL ?? "http://localhost:8080";
+/** Regenerating kills the live key instantly, so the user must type the wallet name to proceed. */
+function RegenerateKeyModal({
+  walletName,
+  onConfirm,
+  onClose,
+}: {
+  walletName: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const matches = typed.trim() === walletName;
+
+  return (
+    <Modal title="Regenerate API key?" onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (matches) onConfirm();
+        }}
+      >
+        <div className="space-y-2 text-sm text-muted">
+          <p>
+            The current key for <strong className="text-foreground">{walletName}</strong>{" "}
+            stops working <strong className="text-foreground">immediately</strong>. Every
+            integration using it will fail until you deploy the new key.
+          </p>
+          <p>This can&apos;t be undone, and the new key is shown only once.</p>
+        </div>
+        <label
+          htmlFor="regen-confirm"
+          className="mt-5 block text-sm font-medium text-foreground"
+        >
+          Type <span className="font-mono text-burgundy-bright">{walletName}</span> to
+          confirm
+        </label>
+        <input
+          id="regen-confirm"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-2 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground focus:border-burgundy-bright focus:outline-none"
+        />
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-sunken"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!matches}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Regenerate key
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
 function maskFrom(key: string) {
@@ -233,18 +308,21 @@ function ActionBtn({
   label,
   onClick,
   primary,
+  disabled,
 }: {
   label: string;
-  onClick?: () => void;
+  onClick: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+      disabled={disabled}
+      className={`disabled:cursor-not-allowed disabled:opacity-60 ${
         primary
-          ? "bg-burgundy text-white hover:bg-burgundy-bright"
-          : "border border-border text-foreground hover:border-border-strong"
+          ? "rounded-lg bg-burgundy px-4 py-2 text-sm font-medium text-foreground hover:bg-burgundy-bright"
+          : "rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-foreground"
       }`}
     >
       {label}

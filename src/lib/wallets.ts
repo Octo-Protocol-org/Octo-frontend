@@ -2,7 +2,14 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
+import { parseAmount, toApiStroops } from "./amount";
+import { pageQuery, type Paginated, type PageOpts } from "./pagination";
+import { fetchAllPages } from "./csv";
+export { usdcForNetwork } from "./network";
+
+export type { Paginated, PageOpts } from "./pagination";
+type RequestOptions = { signal?: AbortSignal };
 
 export type CreateWalletResponse = {
   id: string;
@@ -10,6 +17,7 @@ export type CreateWalletResponse = {
   address: string;
   custody: string;
   funded: boolean;
+  backup_version?: string | null;
 };
 
 export type WalletView = {
@@ -88,11 +96,16 @@ export function createWallet(
     encryptedBackup?: string;
     label?: string;
     description?: string;
+    idempotencyKey?: string;
   },
 ) {
   return apiFetch<CreateWalletResponse>("/v1/wallets", {
     method: "POST",
     token,
+    timeoutMs: 30_000,
+    headers: params.idempotencyKey
+      ? { "Idempotency-Key": params.idempotencyKey }
+      : undefined,
     body: JSON.stringify({
       public_key: params.publicKey,
       challenge: params.challenge,
@@ -112,7 +125,7 @@ export type GasTankResult = {
 
 /** Provision the server-held gas tank that pays sponsored fees (fee float only, never funds). */
 export function createGasTank(token: string, id: string) {
-  return apiFetch<GasTankResult>(`/v1/wallets/${id}/gas-tank`, {
+  return apiFetch<GasTankResult>(path`/v1/wallets/${id}/gas-tank`, {
     method: "POST",
     token,
   });
@@ -126,33 +139,42 @@ export function createGasTank(token: string, id: string) {
  * `undefined` and renders an empty list, which is exactly how a freshly created wallet went
  * missing from the dashboard.
  */
-export type Paginated<T> = {
-  data: T[];
-  /** Pass as `?before=` to fetch the next page; null when there are no more rows. */
-  next_cursor: string | null;
-};
-
 /** List the authenticated user's wallets (newest first). */
 export async function listWallets(token: string): Promise<WalletView[]> {
   const page = await apiFetch<Paginated<WalletView>>("/v1/wallets", { token });
   return page.data;
 }
 
-export function getWallet(token: string, id: string) {
-  return apiFetch<WalletView>(`/v1/wallets/${id}`, { token });
+/** Cursor-paginated wallet list — use this when the caller needs to walk all pages. */
+export function listWalletsPage(
+  token: string,
+  opts?: PageOpts,
+): Promise<Paginated<WalletView>> {
+  return apiFetch<Paginated<WalletView>>("/v1/wallets" + pageQuery(opts), { token });
+}
+
+/** Fetch every wallet by walking all cursor pages. */
+export function listAllWallets(token: string): Promise<WalletView[]> {
+  return fetchAllPages((before) => listWalletsPage(token, { before }));
+}
+
+export function getWallet(token: string, id: string, options: RequestOptions = {}) {
+  return apiFetch<WalletView>(path`/v1/wallets/${id}`, { token, ...options });
 }
 
 // Balances come straight from Horizon and are not paginated — a flat array here is correct.
-export function getBalances(token: string, id: string) {
-  return apiFetch<Balance[]>(`/v1/wallets/${id}/balances`, { token });
+export function getBalances(token: string, id: string, options: RequestOptions = {}) {
+  return apiFetch<Balance[]>(path`/v1/wallets/${id}/balances`, { token, ...options });
 }
 
-export async function listAddresses(
+/** First page of addresses up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentAddresses(
   token: string,
   id: string,
+  limit = 20,
 ): Promise<Address[]> {
   const page = await apiFetch<Paginated<Address>>(
-    `/v1/wallets/${id}/addresses`,
+    path`/v1/wallets/${id}/addresses` + pageQuery({ limit }),
     { token },
   );
   return page.data;
@@ -163,44 +185,34 @@ export function createAddress(
   id: string,
   customerRef?: string,
 ) {
-  return apiFetch<Address>(`/v1/wallets/${id}/addresses`, {
+  return apiFetch<Address>(path`/v1/wallets/${id}/addresses`, {
     method: "POST",
     token,
     body: JSON.stringify({ customer_ref: customerRef || null }),
   });
 }
 
-export async function listTransactions(
+/** Rows shown on the wallet overview. Every overview fetch uses this one limit. */
+export const RECENT_TRANSACTIONS_LIMIT = 10;
+
+/** First page of transactions up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentTransactions(
   token: string,
   id: string,
+  limitOrOptions: number | RequestOptions = RECENT_TRANSACTIONS_LIMIT,
 ): Promise<Transaction[]> {
+  const limit = typeof limitOrOptions === "number" ? limitOrOptions : RECENT_TRANSACTIONS_LIMIT;
+  const options = typeof limitOrOptions === "number" ? {} : limitOrOptions;
   const page = await apiFetch<Paginated<Transaction>>(
-    `/v1/wallets/${id}/transactions`,
-    { token },
+    path`/v1/wallets/${id}/transactions` + pageQuery({ limit }),
+    { token, ...options },
   );
   return page.data;
 }
 
-/** Options shared by the paginated list helpers. */
-export type PageOpts = {
-  /** Rows per page (backend default 50, max 200). */
-  limit?: number;
-  /** Cursor from the previous page's `next_cursor`; omit for the first page. */
-  before?: string | null;
-};
-
-function pageQuery(opts?: PageOpts): string {
-  const params = new URLSearchParams();
-  if (opts?.limit) params.set("limit", String(opts.limit));
-  if (opts?.before) params.set("before", opts.before);
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
-}
-
 /**
- * Paginated transactions. Unlike `listTransactions`, this keeps `next_cursor` so the caller can
- * page forward — the backend has always supported cursors, the UI just discarded them and
- * silently showed only the first page.
+ * Cursor-paginated transactions. Unlike `listRecentTransactions`, this keeps `next_cursor`
+ * so the caller can page forward.
  */
 export function listTransactionsPage(
   token: string,
@@ -208,7 +220,7 @@ export function listTransactionsPage(
   opts?: PageOpts,
 ): Promise<Paginated<Transaction>> {
   return apiFetch<Paginated<Transaction>>(
-    `/v1/wallets/${id}/transactions${pageQuery(opts)}`,
+    path`/v1/wallets/${id}/transactions` + pageQuery(opts),
     { token },
   );
 }
@@ -220,14 +232,35 @@ export function listAddressesPage(
   opts?: PageOpts,
 ): Promise<Paginated<Address>> {
   return apiFetch<Paginated<Address>>(
-    `/v1/wallets/${id}/addresses${pageQuery(opts)}`,
+    path`/v1/wallets/${id}/addresses` + pageQuery(opts),
     { token },
   );
 }
 
-/** Format integer stroops as a decimal XLM-style string (7 dp). */
-export function stroopsToAmount(stroops: number): string {
-  return (stroops / 10_000_000).toFixed(7);
+/** Lists the first page of wallet addresses. Use `listAddressesPage` to page forward. */
+export async function listAddresses(
+  token: string,
+  id: string,
+  options: RequestOptions = {},
+): Promise<Address[]> {
+  const page = await apiFetch<Paginated<Address>>(path`/v1/wallets/${id}/addresses`, {
+    token,
+    ...options,
+  });
+  return page.data;
+}
+
+/** Lists the first page of wallet transactions. Use `listTransactionsPage` to page forward. */
+export async function listTransactions(
+  token: string,
+  id: string,
+  options: RequestOptions = {},
+): Promise<Transaction[]> {
+  const page = await apiFetch<Paginated<Transaction>>(path`/v1/wallets/${id}/transactions`, {
+    token,
+    ...options,
+  });
+  return page.data;
 }
 
 /**
@@ -240,23 +273,8 @@ export function displayAssetCode(assetCode: string): string {
 
 /** Parse a decimal XLM amount string into integer stroops, or null if invalid. */
 export function amountToStroops(xlm: string): number | null {
-  const n = Number(xlm);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 10_000_000);
+  return toApiStroops(parseAmount(xlm));
 }
-
-/**
- * The most widely-used USDC issuer on the Stellar **testnet** (~45k trustlines) —
- * the one testnet faucets/tutorials mint against. auth_required=false, so a
- * trustline just works (it is auth_revocable, which is harmless on testnet).
- * Testnet has no single "canonical" Circle USDC the way mainnet does.
- * (Mainnet USDC is GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN —
- * wire this up per-network when mainnet lands.)
- */
-export const USDC_TESTNET = {
-  code: "USDC",
-  issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-} as const;
 
 // Withdrawals and trustlines are now built + signed CLIENT-SIDE via `@/lib/sdk` and relayed
 // through `submitSigned` — the server holds no key to sign them. The old custodial
@@ -275,13 +293,13 @@ export type GeneratedKey = {
 };
 
 /** Metadata about the wallet's API key (prefix + whether configured) — never the secret. */
-export function getApiKey(token: string, id: string) {
-  return apiFetch<ApiKeyInfo>(`/v1/wallets/${id}/api-key`, { token });
+export function getApiKey(token: string, id: string, options: RequestOptions = {}) {
+  return apiFetch<ApiKeyInfo>(path`/v1/wallets/${id}/api-key`, { token, ...options });
 }
 
 /** Generate (or regenerate) the wallet's API key. Returns the full key once. */
 export function generateApiKey(token: string, id: string) {
-  return apiFetch<GeneratedKey>(`/v1/wallets/${id}/api-key`, {
+  return apiFetch<GeneratedKey>(path`/v1/wallets/${id}/api-key`, {
     method: "POST",
     token,
   });
@@ -303,11 +321,11 @@ export type WhitelistedAddress = {
 };
 
 export function getWhitelistConfig(token: string, id: string) {
-  return apiFetch<WhitelistConfig>(`/v1/wallets/${id}/whitelist/config`, { token });
+  return apiFetch<WhitelistConfig>(path`/v1/wallets/${id}/whitelist/config`, { token });
 }
 
 export function setWhitelistEnabled(token: string, id: string, enabled: boolean) {
-  return apiFetch<WhitelistConfig>(`/v1/wallets/${id}/whitelist/config`, {
+  return apiFetch<WhitelistConfig>(path`/v1/wallets/${id}/whitelist/config`, {
     method: "PUT",
     token,
     body: JSON.stringify({ enabled }),
@@ -315,7 +333,7 @@ export function setWhitelistEnabled(token: string, id: string, enabled: boolean)
 }
 
 export function listWhitelistedAddresses(token: string, id: string) {
-  return apiFetch<WhitelistedAddress[]>(`/v1/wallets/${id}/whitelist`, { token });
+  return apiFetch<WhitelistedAddress[]>(path`/v1/wallets/${id}/whitelist`, { token });
 }
 
 export function addWhitelistedAddress(
@@ -324,7 +342,7 @@ export function addWhitelistedAddress(
   address: string,
   label?: string,
 ) {
-  return apiFetch<WhitelistedAddress>(`/v1/wallets/${id}/whitelist`, {
+  return apiFetch<WhitelistedAddress>(path`/v1/wallets/${id}/whitelist`, {
     method: "POST",
     token,
     body: JSON.stringify({ address, label: label || null }),
@@ -332,9 +350,8 @@ export function addWhitelistedAddress(
 }
 
 export function removeWhitelistedAddress(token: string, id: string, entryId: string) {
-  return apiFetch<{ removed: boolean }>(`/v1/wallets/${id}/whitelist/${entryId}`, {
+  return apiFetch<{ removed: boolean }>(path`/v1/wallets/${id}/whitelist/${entryId}`, {
     method: "DELETE",
     token,
   });
 }
-

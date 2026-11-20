@@ -12,6 +12,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * We use a per-request nonce with `strict-dynamic` (the Next.js-recommended strict approach).
  * Production needs no `'unsafe-eval'`/`'wasm-unsafe-eval'` because our crypto stack
  * (@noble, @scure, @stellar/stellar-base) is pure JS and uses WebCrypto — no WASM, no eval.
+ *
+ * COOP `same-origin` severs `window.opener` links to cross-origin windows (tab-nabbing, XS-Leaks
+ * via window references). Freighter is unaffected: it talks to the page through its extension
+ * content script via postMessage and opens its own extension popup, not a cross-origin
+ * `window.open`. CORP `same-origin` stops other sites embedding our responses (Spectre-style
+ * leaks); it only governs responses we serve, so uploads to and images from Cloudinary still work.
  */
 function apiOrigin(): string {
   // The browser talks to the Octo API (which in turn reaches Horizon server-side), so only the
@@ -38,27 +44,95 @@ const CLOUDINARY_CDN = "https://res.cloudinary.com";
 // src/lib/theme.test.ts recomputes this and fails if the script and hash drift apart.
 const THEME_SCRIPT_HASH = "'sha256-b0IjdpRDazTe7ymepRk7Xjq0NgKhw2H6Gs56SknLntg='";
 
+// CSP violation reporting endpoint, read from the documented CSP_REPORT_ENDPOINT variable. When
+// set to a valid absolute http(s) URL, both CSP branches report violations here so an injection
+// attempt (or a regression we shipped) is visible instead of silently blocked. Empty or malformed
+// values are ignored, leaving reporting disabled.
+function cspReportEndpoint(): string | undefined {
+  const raw = process.env.CSP_REPORT_ENDPOINT?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+const CSP_REPORT_GROUP = "csp-endpoint";
+
+type DeploymentEnv = "production" | "preview" | "staging" | "development";
+
+/**
+ * Resolve the deployment environment for environment-specific headers (HSTS).
+ *
+ * `OCTO_DEPLOY_ENV` is a project-specific override; otherwise we use `VERCEL_ENV`, which the
+ * platform sets to `production`, `preview`, or `development`. A local dev server (NODE_ENV
+ * development) is always development. Anything unrecognized in a production build fails safe to
+ * `preview`, so an unknown environment gets the short HSTS policy rather than the irreversible
+ * `includeSubDomains; preload` commitment.
+ */
+function deploymentEnv(): DeploymentEnv {
+  if (process.env.NODE_ENV === "development") return "development";
+  const raw = (
+    process.env.OCTO_DEPLOY_ENV ??
+    process.env.VERCEL_ENV ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+  switch (raw) {
+    case "production":
+    case "prod":
+      return "production";
+    case "preview":
+      return "preview";
+    case "staging":
+    case "stage":
+      return "staging";
+    case "development":
+    case "dev":
+      return "development";
+    default:
+      return "preview";
+  }
+}
+
 export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
+  const deployEnv = deploymentEnv();
   const connect = `connect-src 'self' ${apiOrigin()} ${CLOUDINARY_UPLOAD}${isDev ? " ws: http://localhost:*" : ""}`;
   const img = `img-src 'self' blob: data: ${CLOUDINARY_CDN}`;
 
-  // The signing surface (dashboard) handles decrypted keys, so it gets a strict, nonce-based CSP
-  // with no `unsafe-inline` on scripts. These pages are forced to dynamic rendering (see each
-  // page's `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto its
-  // scripts. Marketing/login/docs pages handle no keys and stay static, so they get a lighter CSP
-  // that does not require a nonce (a nonce would block their prerendered scripts).
+  // Routes that handle credentials or session state (password at login/signup/reset, decrypted
+  // keys in localStorage across the dashboard, and the payer's transaction details at checkout)
+  // get a strict, nonce-based CSP with no `unsafe-inline` on scripts — an XSS there could capture
+  // a password or tamper with a transaction before signing. They are forced to dynamic rendering
+  // (each page sets `export const dynamic = "force-dynamic"`) so Next can stamp the nonce onto
+  // its scripts. Purely static marketing/docs pages handle no credentials and stay on the lighter
+  // CSP that does not require a nonce (a nonce would block their prerendered scripts).
   const pathname = request.nextUrl.pathname;
-  // The strict CSP applies to routes that actually decrypt/handle a private key in the browser:
-  // wallet creation (keygen) and the per-wallet page (withdraw/trustline signing). Other
-  // dashboard pages (overview, audit, sponsorship) only read data and use the lighter CSP.
-  // Matches /dashboard/wallets/new (keygen) and /dashboard/wallets/<id>/* (signing).
-  const isSigningSurface = /^\/dashboard\/wallets\/[^/]+/.test(pathname);
+  // Credential/session-handling routes: login/signup/reset, the whole authenticated dashboard,
+  // and the public checkout.
+  const isStrictRoute =
+    /^\/login(\/|$)/.test(pathname) ||
+    /^\/signup(\/|$)/.test(pathname) ||
+    /^\/forgot-password(\/|$)/.test(pathname) ||
+    /^\/dashboard(\/|$)/.test(pathname) ||
+    /^\/pay(\/|$)/.test(pathname);
+
+  // Only add reporting directives when a valid endpoint is configured, so an unset or malformed
+  // variable leaves the CSP and headers exactly as before.
+  const reportEndpoint = cspReportEndpoint();
+  const reportDirectives = reportEndpoint
+    ? [`report-uri ${reportEndpoint}`, `report-to ${CSP_REPORT_GROUP}`]
+    : [];
 
   const requestHeaders = new Headers(request.headers);
   let csp: string;
 
-  if (isSigningSurface) {
+  if (isStrictRoute) {
     const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
     csp = [
       `default-src 'self'`,
@@ -75,12 +149,15 @@ export function proxy(request: NextRequest) {
       `form-action 'self'`,
       `frame-ancestors 'none'`,
       `upgrade-insecure-requests`,
+      ...reportDirectives,
     ].join("; ");
     // Pass the nonce down so Next.js attaches it to its framework/page scripts.
     requestHeaders.set("x-nonce", nonce);
   } else {
     // Static-friendly CSP: no nonce (so prerendered scripts still run), but still no third-party
     // script origins. These routes never touch a private key.
+    // The theme-script hash is deliberately omitted here: a hash makes browsers ignore
+    // 'unsafe-inline', which would block Next's own inline hydration scripts on prerendered pages.
     csp = [
       `default-src 'self'`,
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -93,6 +170,7 @@ export function proxy(request: NextRequest) {
       `form-action 'self'`,
       `frame-ancestors 'none'`,
       `upgrade-insecure-requests`,
+      ...reportDirectives,
     ].join("; ");
   }
 
@@ -101,20 +179,33 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("Content-Security-Policy", csp);
+  // Reporting-Endpoints pairs with the CSP `report-to` directive so browsers can POST violations.
+  if (reportEndpoint) {
+    response.headers.set(
+      "Reporting-Endpoints",
+      `${CSP_REPORT_GROUP}="${reportEndpoint}"`,
+    );
+  }
   // Defense-in-depth headers.
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
   response.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
   );
-  // Only send HSTS in production over HTTPS.
-  if (!isDev) {
+  // HSTS is environment-specific (see SECURITY.md): only production commits to
+  // `includeSubDomains; preload` for two years. Preview and staging hosts are ephemeral, so they
+  // get a short max-age with no subdomain/preload pinning. Development sends no HSTS at all.
+  if (deployEnv === "production") {
     response.headers.set(
       "Strict-Transport-Security",
       "max-age=63072000; includeSubDomains; preload",
     );
+  } else if (deployEnv === "preview" || deployEnv === "staging") {
+    response.headers.set("Strict-Transport-Security", "max-age=300");
   }
 
   return response;

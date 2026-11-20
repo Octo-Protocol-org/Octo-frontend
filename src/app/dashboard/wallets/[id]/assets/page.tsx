@@ -1,23 +1,22 @@
 "use client";
 
+import { errorMessage } from "@/lib/api";
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { useWallet } from "@/lib/useWallet";
 import {
-  getWallet,
   getBalances,
-  USDC_TESTNET,
-  type WalletView,
   type Balance,
 } from "@/lib/wallets";
-import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
 import { AssetIcon } from "@/components/dashboard/AssetIcon";
-import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { SpendableReservedBreakdown } from "@/components/assets/SpendableReservedBreakdown";
+import { network } from "@/lib/network";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — this page reads wallet
 // balances, matching the other /dashboard/wallets/:id/* pages.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function AssetsPage({
@@ -26,9 +25,9 @@ export default function AssetsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading } = useAuth();
 
-  const [wallet, setWallet] = useState<WalletView | null>(null);
+  const { wallet } = useWallet(id);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showUsd, setShowUsd] = useState(false);
@@ -43,25 +42,27 @@ export default function AssetsPage({
         setError(null);
       })
       .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not load balances."),
+        setError(errorMessage(e, "Could not load balances.")),
       )
       .finally(() => setRefreshing(false));
   }
 
   useEffect(() => {
     if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    getBalances(token, id)
+    const controller = new AbortController();
+    getBalances(token, id, { signal: controller.signal })
       .then((b) => {
         setBalances(b);
         setError(null);
       })
       .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
         setBalances([]);
         // Without this the page shows "no assets", which looks like an empty wallet rather
         // than a failed request.
-        setError(e instanceof Error ? e.message : "Could not load balances.");
+        setError(errorMessage(e, "Could not load balances."));
       });
+    return () => controller.abort();
   }, [token, id]);
 
   if (loading || !user) {
@@ -74,37 +75,13 @@ export default function AssetsPage({
   const credits = balances.filter((b) => b.asset_type !== "native");
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
-      <DashboardBackground />
+    <>
+    <WalletPageShell
+      walletId={id}
+      walletName={wallet?.label ?? "Master wallet"}
+      section="Assets"
+    >
 
-      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
-        You are currently on <strong>test mode</strong> (Stellar testnet).
-      </div>
-      <div className="relative z-10 flex flex-1">
-        <WalletSidebar
-          walletId={id}
-          walletName={wallet?.label ?? "Master wallet"}
-        />
-
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border px-8 py-4">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Link href="/dashboard" className="hover:text-foreground">
-                My Wallets
-              </Link>
-              <span>›</span>
-              <Link href={`/dashboard/wallets/${id}`} className="hover:text-foreground">
-                {wallet?.label ?? "Master wallet"}
-              </Link>
-              <span>›</span>
-              <span className="text-foreground">Assets</span>
-            </div>
-            <button onClick={logout} className="text-sm text-muted hover:text-foreground">
-              ⏻
-            </button>
-          </header>
-
-          <main className="flex-1 px-8 py-8">
           <div className="mx-auto w-full max-w-6xl space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -121,21 +98,26 @@ export default function AssetsPage({
                   className="accent-[var(--burgundy-bright)]"
                 />
                 Show USD equivalent
-                <span className="text-[10px] text-muted/60">(unavailable on testnet)</span>
+                <span className="text-[10px] text-muted/60">
+                  {network.isTestnet
+                    ? `(unavailable on ${network.displayName})`
+                    : "(live pricing)"}
+                </span>
               </label>
             </div>
 
             {/* stat cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               <Stat label="Total XLM" value={xlm ? `${xlm.balance} XLM` : "0 XLM"} />
-              <Stat label="No. of assets" value={String(balances.length || (xlm ? 1 : 0))} />
+              <Stat label="No. of assets" value={String(balances.length)} />
               <Stat
                 label="Trustlines held"
                 value={String(credits.length)}
                 sub="Non-native assets"
               />
-              <Stat label="Reserve" value="1.0 XLM" sub="Base account reserve" />
             </div>
+
+            <SpendableReservedBreakdown token={token} walletId={id} balances={balances} />
 
             {error && (
               <p className="rounded-lg border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger">
@@ -184,17 +166,14 @@ export default function AssetsPage({
             {credits.length === 0 && (
               <p className="text-xs text-muted">
                 Only XLM is held right now. This wallet can also hold credit assets like{" "}
-                <span className="font-mono text-foreground">
-                  {USDC_TESTNET.code}
-                </span>{" "}
+                <span className="font-mono text-foreground">USDC</span>{" "}
                 once a trustline is added from the wallet Overview page.
               </p>
             )}
           </div>
-          </main>
-        </div>
-      </div>
-    </div>
+
+    </WalletPageShell>
+  </>
   );
 }
 
@@ -227,7 +206,11 @@ function AssetRow({
       <td className="py-3 pr-4 font-medium text-foreground">
         {balance.balance} {code}
         {showUsd && (
-          <span className="ml-2 text-[11px] text-muted">(USD n/a on testnet)</span>
+          <span className="ml-2 text-[11px] text-muted">
+            {network.isTestnet
+              ? `(USD n/a on ${network.displayName})`
+              : "(USD n/a)"}
+          </span>
         )}
       </td>
       <td className="py-3 pr-4 text-muted">

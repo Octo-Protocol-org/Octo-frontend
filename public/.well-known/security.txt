@@ -1,0 +1,6 @@
+Contact: mailto:security@octoprotocol.org
+Contact: https://github.com/Octo-Protocol-org/Octo-frontend/security/advisories/new
+Expires: 2027-01-01T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/Octo-Protocol-org/Octo-frontend/blob/main/SECURITY.md
+Canonical: https://octoprotocol.org/.well-known/security.txt

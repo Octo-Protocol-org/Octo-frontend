@@ -2,7 +2,13 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
+import { formatStroops } from "./amount";
+import { pageQuery, type PageOpts, type Paginated } from "./pagination";
+
+import type { AuthToken, WalletId } from "./brands";
+
+export type { AuthToken, WalletId };
 
 export type SponsorshipConfig = {
   enabled: boolean;
@@ -19,19 +25,24 @@ export type SponsorshipConfigPayload = {
 };
 
 /** Fetch the gas sponsorship config for a single wallet. */
-export function getSponsorshipConfig(walletId: string, token: string) {
-  return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
+export function getSponsorshipConfig(
+  token: AuthToken,
+  walletId: WalletId,
+  options: { signal?: AbortSignal } = {},
+) {
+  return apiFetch<SponsorshipConfig>(path`/v1/wallets/${walletId}/sponsorship`, {
     token,
+    signal: options.signal,
   });
 }
 
 /** Update (upsert) the gas sponsorship config for a wallet. */
 export function updateSponsorshipConfig(
-  walletId: string,
-  token: string,
+  token: AuthToken,
+  walletId: WalletId,
   payload: SponsorshipConfigPayload,
 ) {
-  return apiFetch<SponsorshipConfig>(`/v1/wallets/${walletId}/sponsorship`, {
+  return apiFetch<SponsorshipConfig>(path`/v1/wallets/${walletId}/sponsorship`, {
     method: "PUT",
     token,
     body: JSON.stringify(payload),
@@ -49,33 +60,27 @@ export type SponsoredTransaction = {
   created_at: string;
 };
 
-export type SponsoredTxnPage = {
-  data: SponsoredTransaction[];
-  /** Pass back as `cursor` to fetch the next page; null when there are no more. */
-  next_cursor: string | null;
-};
+export type SponsoredTxnPage = Paginated<SponsoredTransaction>;
 
 /**
  * List a wallet's sponsored transactions, newest first (50 per page).
  * Pass the previous page's `next_cursor` to fetch the following page.
  */
 export function listSponsoredTransactions(
-  walletId: string,
-  token: string,
-  cursor?: string,
+  token: AuthToken,
+  walletId: WalletId,
+  opts?: PageOpts,
 ) {
-  const params = new URLSearchParams({ limit: "50" });
-  if (cursor) params.set("before", cursor);
   return apiFetch<SponsoredTxnPage>(
-    `/v1/wallets/${walletId}/sponsored-transactions?${params.toString()}`,
+    path`/v1/wallets/${walletId}/sponsored-transactions` + pageQuery({ limit: opts?.limit ?? 50, before: opts?.before }),
     { token },
   );
 }
 
 /**
- * Format integer stroops as a human-readable XLM string (2 dp).
- * Raw stroop values are for the API only — never expose them to end users.
+ * Format integer stroops as a human-readable XLM string (up to 7 dp, trailing zeros trimmed).
+ * Stellar fees are tiny (base fee 100 stroops = 0.00001 XLM), so rounding to 2 dp hid them.
  */
 export function stroopsToXlm(stroops: number): string {
-  return `${(stroops / 10_000_000).toFixed(2)} XLM`;
+  return `${formatStroops(stroops)} XLM`;
 }

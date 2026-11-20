@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
-import { listAuditLogs, type AuditLog } from "@/lib/audit";
+import { listAuditLogsPage } from "@/lib/audit";
+import { useCursorPagination } from "@/lib/useCursorPagination";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { RelativeTime } from "@/components/RelativeTime";
 
 const CATEGORIES = [
   { value: "all", label: "All categories" },
@@ -25,23 +28,33 @@ const CATEGORY_COLOR: Record<string, string> = {
 
 export default function AuditLogsPage() {
   const { user, token, loading, logout } = useAuth();
-  const [logs, setLogs] = useState<AuditLog[] | null>(null);
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
-
-  const load = useCallback(() => {
-    if (!token) return;
-    setLogs(null);
-    listAuditLogs(token, { category, search })
-      .then(setLogs)
-      .catch(() => setLogs([]));
-  }, [token, category, search]);
-
+  // The search waits 350 ms after typing, and applies at once when cleared.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    // Debounce search; refetch on category change immediately.
-    const t = setTimeout(load, search ? 350 : 0);
+    const t = setTimeout(() => setDebouncedSearch(search), search ? 350 : 0);
     return () => clearTimeout(t);
-  }, [load, search]);
+  }, [search]);
+
+  const {
+    rows,
+    loaded,
+    loading: logsLoading,
+    error,
+    page,
+    hasPrev,
+    hasNext,
+    next,
+    prev,
+  } = useCursorPagination(
+    (before) => listAuditLogsPage(token ?? "", { category, search: debouncedSearch, before }),
+    [category, debouncedSearch],
+    "Failed to load audit logs.",
+    Boolean(token),
+  );
+  // Null while loading, empty after an error, so the list shows the same states as before.
+  const logs = loaded && !logsLoading ? (error ? [] : rows) : null;
 
   if (loading || !user) {
     return (
@@ -76,13 +89,18 @@ export default function AuditLogsPage() {
           </select>
         </div>
 
+        {error && (
+          <p className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-burgundy-bright">
+            {error}
+          </p>
+        )}
+
         {/* table */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-border">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface-raised text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-5 py-3">Activity</th>
-                <th className="px-5 py-3">User</th>
                 <th className="px-5 py-3">Category</th>
                 <th className="px-5 py-3">IP Address</th>
                 <th className="px-5 py-3 text-right">Time</th>
@@ -102,7 +120,6 @@ export default function AuditLogsPage() {
                         <span className="text-muted"> · {l.target}</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-muted">{user.email}</td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center gap-1.5 text-xs capitalize text-muted">
                         <span
@@ -123,7 +140,7 @@ export default function AuditLogsPage() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-right text-xs text-muted">
-                      {timeAgo(l.created_at)}
+                      <RelativeTime date={l.created_at} />
                     </td>
                   </tr>
                 ))
@@ -131,6 +148,15 @@ export default function AuditLogsPage() {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          page={page}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          loading={logs === null}
+          onPrev={prev}
+          onNext={next}
+        />
 
         {logs && logs.length > 0 && (
           <p className="mt-4 text-xs text-muted">
@@ -152,24 +178,11 @@ function Row({
   return (
     <tr>
       <td
-        colSpan={colSpan ? 5 : 1}
+        colSpan={colSpan ? 4 : 1}
         className="px-5 py-10 text-center text-sm text-muted"
       >
         {children}
       </td>
     </tr>
   );
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m} minute${m === 1 ? "" : "s"} ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
-  return new Date(iso).toLocaleDateString();
 }

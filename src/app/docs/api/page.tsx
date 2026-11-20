@@ -1,5 +1,8 @@
+export const metadata = { title: "API Overview — Octo" };
+
 import Link from "next/link";
 import { Prose, Code } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function ApiOverview() {
   return (
@@ -10,8 +13,8 @@ export default function ApiOverview() {
       <h1 className="mt-2 text-4xl font-semibold text-foreground">Overview</h1>
 
       <p>
-        The Octo API is a JSON REST API. The base URL in local development is{" "}
-        <code>http://localhost:8080</code>.
+        The Octo API is a JSON REST API. The base URL is <code>{API_URL}</code>{" "}
+        (<code>http://localhost:8080</code> when running the backend locally).
       </p>
 
       <h2>Response envelope</h2>
@@ -51,6 +54,16 @@ export default function ApiOverview() {
           <code>409</code> — conflict (e.g. a reused idempotency key).
         </li>
       </ul>
+
+      <h2>Webhooks</h2>
+      <p>
+        Register webhook endpoints with{" "}
+        <code>POST /v1/wallets/:id/webhooks</code> and keep the signing secret
+        that is shown once. You can also manage endpoints — list, add, rotate
+        the secret, and delete — from the dashboard{" "}
+        <Link href="/dashboard">Webhooks page</Link> for each wallet, without
+        using curl.
+      </p>
 
       <p>
         Next: <Link href="/docs/api/authentication">Authentication</Link>.

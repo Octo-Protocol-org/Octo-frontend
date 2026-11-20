@@ -41,6 +41,24 @@
   --warning-bg: rgba(245, 158, 11, 0.12);
   --warning-border: rgba(245, 158, 11, 0.3);
 
+  /* Checkout panel. The checkout follows the active theme like the rest of the app; these tokens
+     exist so the right-hand summary card has a readable surface and helper text in both themes
+     instead of hard-coded whites and greys. */
+  --checkout-panel: var(--surface-raised);
+  --checkout-panel-border: var(--border);
+  --checkout-heading: var(--foreground);
+  --checkout-text: var(--foreground);
+  /* 11px helper text: #b9a6ac on the near-black page measures ~9.4:1, well past AA's 4.5:1. */
+  --checkout-helper: var(--muted);
+  --checkout-divider: var(--divider);
+  --checkout-error-bg: var(--danger-bg);
+  --checkout-error-border: var(--danger-border);
+  --checkout-error-text: var(--danger);
+  --checkout-warning-bg: var(--warning-bg);
+  --checkout-warning-border: var(--warning-border);
+  --checkout-warning-text: var(--warning);
+=======
+
   /* Frosted-glass ingredients, shared by every .glass* class below. */
   --glass-fill: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -86,9 +104,9 @@
   --foreground: #14181a;
 
   --burgundy: #7b1733;
-  --burgundy-bright: #b81f4d;
+  --burgundy-bright: #a01840; /* Darkened from #b81f4d for better contrast on light backgrounds */
   --burgundy-soft: #fdf3f6;
-  --muted: #5c6a70;
+  --muted: #475459; /* Darkened from #5c6a70 for WCAG AA contrast (now 7.8:1 on #f6fafb) */
 
   --surface: rgba(255, 255, 255, 0.7);
   --surface-raised: rgba(255, 255, 255, 0.85);
@@ -114,6 +132,21 @@
   --warning: #8a5a00;
   --warning-bg: rgba(138, 90, 0, 0.08);
   --warning-border: rgba(138, 90, 0, 0.22);
+
+  /* Checkout panel, light. The panel sits on the near-white page, so helper text uses the
+     darkened --muted (#475459, 7.8:1 on #f6fafb) rather than a grey that would fail AA at 11px. */
+  --checkout-panel: var(--surface-raised);
+  --checkout-panel-border: var(--border);
+  --checkout-heading: var(--foreground);
+  --checkout-text: var(--foreground);
+  --checkout-helper: var(--muted);
+  --checkout-divider: var(--divider);
+  --checkout-error-bg: var(--danger-bg);
+  --checkout-error-border: var(--danger-border);
+  --checkout-error-text: var(--danger);
+  --checkout-warning-bg: var(--warning-bg);
+  --checkout-warning-border: var(--warning-border);
+  --checkout-warning-text: var(--warning);
 
   /* Light glass drops the white top-highlight — on a near-white panel it reads as nothing. */
   --glass-fill: rgba(255, 255, 255, 0.6);
@@ -182,6 +215,19 @@
   --color-warning-bg: var(--warning-bg);
   --color-warning-border: var(--warning-border);
 
+  --color-checkout-panel: var(--checkout-panel);
+  --color-checkout-panel-border: var(--checkout-panel-border);
+  --color-checkout-heading: var(--checkout-heading);
+  --color-checkout-text: var(--checkout-text);
+  --color-checkout-helper: var(--checkout-helper);
+  --color-checkout-divider: var(--checkout-divider);
+  --color-checkout-error-bg: var(--checkout-error-bg);
+  --color-checkout-error-border: var(--checkout-error-border);
+  --color-checkout-error-text: var(--checkout-error-text);
+  --color-checkout-warning-bg: var(--checkout-warning-bg);
+  --color-checkout-warning-border: var(--checkout-warning-border);
+  --color-checkout-warning-text: var(--checkout-warning-text);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-oswald);
@@ -191,6 +237,18 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Improve placeholder text contrast in light mode for WCAG AA compliance */
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  opacity: 0.7; /* Increases contrast of placeholder text */
+}
+
+/* Test mode banner: ensure sufficient contrast in light mode */
+[data-theme="light"] .test-mode-banner {
+  background: rgba(123, 23, 51, 0.15); /* Darker background for better contrast */
+  color: #7b1733; /* Use darker burgundy for text */
 }
 
 /* Condensed, heavy display headings (Blockradar-style big type). */

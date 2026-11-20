@@ -1,24 +1,27 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { errorMessage } from "@/lib/api";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
+import { useWallet } from "@/lib/useWallet";
 import {
-  getWallet,
-  listAddresses,
+  listAddressesPage,
   createAddress,
-  stroopsToAmount,
-  type WalletView,
   type Address,
 } from "@/lib/wallets";
-import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
-import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { Stat, ActionButton, Panel, Empty } from "@/components/dashboard/WalletUI";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { Pagination } from "@/components/dashboard/Pagination";
+import { AddressSearchBox } from "@/components/addresses/AddressSearchBox";
+import { filterAddressesByRef } from "@/lib/addressSearch";
+import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
+import { formatStroops } from "@/lib/amount";
 
 // Dynamic render so the strict nonce CSP (src/proxy.ts) applies — matches the other
 // /dashboard/wallets/:id/* pages, which all read wallet-scoped data.
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
 export default function AddressesPage({
@@ -27,58 +30,75 @@ export default function AddressesPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading } = useAuth();
 
-  const [wallet, setWallet] = useState<WalletView | null>(null);
+  const { wallet } = useWallet(id);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [askingRef, setAskingRef] = useState(false);
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Address | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // `cursors[i]` is the `before` cursor for page i+1; the API has no offsets, so Prev is a pop.
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    (before: string | null) => {
+      if (!token) return;
+      setRefreshing(true);
+      listAddressesPage(token, id, { before })
+        .then((page) => {
+          setAddresses(page.data);
+          setNextCursor(page.next_cursor);
+          setError(null);
+        })
+        .catch((e) => {
+          setError(errorMessage(e, "Could not load addresses."));
+        })
+        .finally(() => setRefreshing(false));
+    },
+    [token, id],
+  );
+
   function refresh() {
-    if (!token) return;
-    setRefreshing(true);
-    listAddresses(token, id)
-      .then((a) => {
-        setAddresses(a);
-        setError(null);
-      })
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not load addresses."),
-      )
-      .finally(() => setRefreshing(false));
+    load(cursors[pageIndex] ?? null);
   }
 
   useEffect(() => {
-    if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => setWallet(null));
-    listAddresses(token, id)
-      .then((a) => {
-        setAddresses(a);
-        setError(null);
-      })
-      .catch((e) => {
-        setAddresses([]);
-        setError(e instanceof Error ? e.message : "Could not load addresses.");
-      });
-  }, [token, id]);
+    load(null);
+  }, [load]);
 
-  async function handleNewAddress() {
+  function goNext() {
+    if (!nextCursor) return;
+    setCursors((c) => [...c.slice(0, pageIndex + 1), nextCursor]);
+    setPageIndex((i) => i + 1);
+    load(nextCursor);
+  }
+
+  function goPrev() {
+    if (pageIndex === 0) return;
+    const target = cursors[pageIndex - 1];
+    setPageIndex((i) => i - 1);
+    load(target ?? null);
+  }
+
+  async function handleNewAddress(customerRef?: string) {
     if (!token) return;
     setCreating(true);
     setError(null);
     try {
-      const addr = await createAddress(token, id);
+      const addr = await createAddress(token, id, customerRef);
       setAddresses((prev) => [addr, ...prev]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not generate a new address.");
+      setError(errorMessage(e, "Could not generate a new address."));
     } finally {
       setCreating(false);
     }
   }
-
-  const totalReceived = addresses.reduce((sum, a) => sum + a.received_stroops, 0);
 
   if (loading || !user) {
     return (
@@ -87,37 +107,14 @@ export default function AddressesPage({
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
-      <DashboardBackground />
+    <>
+    {askingRef && <NewAddressModal onSubmit={handleNewAddress} onClose={() => setAskingRef(false)} />}
+    <WalletPageShell
+      walletId={id}
+      walletName={wallet?.label ?? "Master wallet"}
+      section="Addresses"
+    >
 
-      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
-        You are currently on <strong>test mode</strong> (Stellar testnet).
-      </div>
-      <div className="relative z-10 flex flex-1">
-        <WalletSidebar
-          walletId={id}
-          walletName={wallet?.label ?? "Master wallet"}
-        />
-
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border px-8 py-4">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Link href="/dashboard" className="hover:text-foreground">
-                My Wallets
-              </Link>
-              <span>›</span>
-              <Link href={`/dashboard/wallets/${id}`} className="hover:text-foreground">
-                {wallet?.label ?? "Master wallet"}
-              </Link>
-              <span>›</span>
-              <span className="text-foreground">Addresses</span>
-            </div>
-            <button onClick={logout} className="text-sm text-muted hover:text-foreground">
-              ⏻
-            </button>
-          </header>
-
-          <main className="flex-1 px-8 py-8">
           <div className="mx-auto w-full max-w-6xl space-y-6">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">Addresses</h1>
@@ -129,13 +126,8 @@ export default function AddressesPage({
             </div>
 
             {/* stat cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Stat label="Total addresses" value={String(addresses.length)} />
-              <Stat
-                label="Total received"
-                value={`${stroopsToAmount(totalReceived)} XLM`}
-                sub="Across all addresses"
-              />
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+              <Stat label="Addresses on this page" value={String(addresses.length)} />
               <Stat
                 label="Address type"
                 value="Muxed (M…)"
@@ -148,7 +140,7 @@ export default function AddressesPage({
               <div className="flex flex-wrap gap-3">
                 <ActionButton
                   label={creating ? "Generating…" : "+ New address"}
-                  onClick={handleNewAddress}
+                  onClick={() => setAskingRef(true)}
                   loading={creating}
                 />
                 <ActionButton
@@ -171,6 +163,8 @@ export default function AddressesPage({
               </p>
             )}
 
+            <AddressSearchBox onChange={setQuery} />
+
             <Panel title={`${addresses.length} address${addresses.length === 1 ? "" : "es"}`}>
               {addresses.length === 0 ? (
                 <Empty>
@@ -188,23 +182,30 @@ export default function AddressesPage({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-divider">
-                      {addresses.map((a) => (
+                      {filterAddressesByRef(addresses, query).map((a) => (
                         <AddressRow key={a.id} address={a} onSelect={() => setSelected(a)} />
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+              <Pagination
+                page={pageIndex + 1}
+                hasPrev={pageIndex > 0}
+                hasNext={nextCursor !== null}
+                loading={refreshing}
+                onPrev={goPrev}
+                onNext={goNext}
+              />
             </Panel>
           </div>
-          </main>
-        </div>
-      </div>
+
+    </WalletPageShell>
 
       {selected && (
         <AddressDetail address={selected} onClose={() => setSelected(null)} />
       )}
-    </div>
+  </>
   );
 }
 
@@ -218,7 +219,14 @@ function AddressRow({
   return (
     <tr
       onClick={onSelect}
-      className="cursor-pointer transition-colors hover:bg-surface-raised"
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
+      className="cursor-pointer transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-burgundy-bright"
     >
       <td className="py-3 pr-4 text-foreground">
         {address.customer_ref ?? <span className="text-muted">—</span>}
@@ -228,9 +236,7 @@ function AddressRow({
       </td>
       <td className="py-3 pr-4 font-mono text-muted">{address.memo_id}</td>
       <td className="py-3 font-medium text-foreground">
-        {address.received_stroops > 0
-          ? `${stroopsToAmount(address.received_stroops)} XLM`
-          : "$0"}
+        {formatStroops(address.received_stroops)}
       </td>
     </tr>
   );
@@ -249,7 +255,10 @@ function AddressDetail({
         <div className="rounded-lg bg-surface-sunken p-3 text-center">
           <p className="text-xs text-muted">Total received</p>
           <p className="mt-1 text-xl font-semibold text-foreground">
-            {stroopsToAmount(address.received_stroops)} XLM
+            {formatStroops(address.received_stroops)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            Deposits across all assets; see Transactions for per-asset amounts.
           </p>
         </div>
 

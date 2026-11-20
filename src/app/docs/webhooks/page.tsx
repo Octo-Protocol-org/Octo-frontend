@@ -1,4 +1,7 @@
+export const metadata = { title: "Webhooks — Octo" };
+
 import { Prose, Code, Callout, Endpoint } from "@/components/docs/DocsUI";
+import { API_URL } from "@/lib/api";
 
 export default function Webhooks() {
   return (
@@ -16,7 +19,7 @@ export default function Webhooks() {
 
       <h2>Register an endpoint</h2>
       <Endpoint method="POST" path="/v1/wallets/:id/webhooks" />
-      <Code label="Request">{`curl -X POST http://localhost:8080/v1/wallets/<WALLET_ID>/webhooks \\
+      <Code label="Request">{`curl -X POST ${API_URL}/v1/wallets/<WALLET_ID>/webhooks \\
   -H "authorization: Bearer octo_sk_test_ab12…" \\
   -H "content-type: application/json" \\
   -d '{ "url": "https://your.app/webhooks/octo" }'`}</Code>
@@ -64,28 +67,38 @@ Content-Type: application/json
       <Code label="Node.js">{`import crypto from "node:crypto";
 
 function verify(rawBody, signature, secret) {
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)            // the exact bytes received
-    .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signature),
-  );
+  if (!rawBody || !signature || !secret || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expectedBytes = Buffer.from(expected, "hex");
+  const receivedBytes = Buffer.from(signature, "hex");
+  return receivedBytes.length === expectedBytes.length &&
+    crypto.timingSafeEqual(expectedBytes, receivedBytes);
 }
 
 app.post("/webhooks/octo", (req, res) => {
   const sig = req.header("X-Octo-Signature");
-  if (!verify(req.rawBody, sig, process.env.OCTO_WEBHOOK_SECRET)) {
-    return res.status(401).end();
+  const secret = process.env.OCTO_WEBHOOK_SECRET;
+  if (!verify(req.rawBody, sig, secret)) return res.status(401).end();
+
+  let payload;
+  try {
+    payload = JSON.parse(req.rawBody.toString("utf8"));
+  } catch {
+    return res.status(400).end();
   }
-  const { event, data } = JSON.parse(req.rawBody);
+  const { event, data } = payload;
+  // Check a durable event key before applying the side effect and return 200 for duplicates.
   // credit data.metadata's user by data.amount_stroops …
   res.status(200).end();
 });`}</Code>
       <Callout type="warning">
         Verify against the <strong>raw body bytes</strong>, not a re-serialized
         object — re-serializing can change the bytes and break the signature.
+      </Callout>
+      <Callout type="note">
+        Deliveries can be retried or duplicated. Store a durable key such as the
+        event ID (and event type), check it before applying side effects, and
+        return <code>2xx</code> for a delivery that was already processed.
       </Callout>
 
       <h2>Delivery &amp; retries</h2>

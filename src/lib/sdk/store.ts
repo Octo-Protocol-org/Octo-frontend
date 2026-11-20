@@ -1,25 +1,77 @@
 /**
  * Local (browser) persistence of the encrypted seed backup, keyed by wallet id.
  *
- * The blob is the SAME opaque ciphertext the server stores — it is useless without the user's
- * password. Keeping a copy locally lets the dashboard unlock a wallet for signing without a
- * server round-trip, and survives if the server copy is ever unavailable. Cleared on logout.
+ * The blob is the same opaque ciphertext the server stores and is useless without the user's
+ * password. Storage is an optional cache because browser policy can make localStorage fail.
+ *
+ * Each cached copy is stamped with a `version` — the server-authoritative `encrypted_backup`
+ * string it was copied from. On unlock, if the local version differs from the server's, the
+ * cache is stale (e.g. the password was changed on another device) and is refreshed before
+ * decryption so the user's current password keeps working across devices.
  */
-import { parseBackup, type EncryptedBackup } from "./crypto";
+import { parseBackup, serializeBackup, type EncryptedBackup } from "./crypto";
 
 const PREFIX = "octo_wallet_backup_";
 
-export function saveLocalBackup(walletId: string, backup: EncryptedBackup) {
+function notifyStorageFailure() {
   if (typeof window === "undefined") return;
-  localStorage.setItem(PREFIX + walletId, JSON.stringify(backup));
+  window.dispatchEvent(
+    new CustomEvent("octo-storage-warning", {
+      detail:
+        "This browser could not cache your encrypted wallet backup. You can continue, but the backup will be fetched from Octo when needed.",
+    }),
+  );
 }
 
-export function loadLocalBackup(walletId: string): EncryptedBackup | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(PREFIX + walletId);
-  if (!raw) return null;
+/** A cached copy of the server's encrypted backup, stamped with its content version. */
+export interface CachedBackup {
+  backup: EncryptedBackup;
+  /** The `encrypted_backup` string this copy was taken from; empty when unknown. */
+  version: string;
+}
+
+/**
+ * The single rule for a backup's version: the server's `backup_version` when it provides one,
+ * otherwise the serialized blob string. `unlockWallet` compares against this value.
+ */
+export function versionOf(remote: {
+  backup_version?: string | null;
+  encrypted_backup?: string | null;
+}): string {
+  return remote.backup_version ?? remote.encrypted_backup ?? "";
+}
+
+/**
+ * Import policy: a backup imported from a file is local-only (it is not uploaded) and is stamped
+ * with its own serialized form as the version. Callers that know the server's version pass it
+ * explicitly; the default never produces an empty version.
+ */
+export function saveLocalBackup(
+  walletId: string,
+  backup: EncryptedBackup,
+  version: string = serializeBackup(backup),
+): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    return parseBackup(raw);
+    localStorage.setItem(PREFIX + walletId, JSON.stringify({ backup, version }));
+    return true;
+  } catch {
+    notifyStorageFailure();
+    return false;
+  }
+}
+
+export function loadLocalBackup(walletId: string): CachedBackup | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PREFIX + walletId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { backup?: unknown; version?: unknown };
+    if (!parsed || typeof parsed.backup !== "object") return null;
+    return {
+      backup: parseBackup(JSON.stringify(parsed.backup)),
+      version: typeof parsed.version === "string" ? parsed.version : "",
+    };
   } catch {
     return null;
   }
@@ -27,7 +79,14 @@ export function loadLocalBackup(walletId: string): EncryptedBackup | null {
 
 export function clearLocalBackups() {
   if (typeof window === "undefined") return;
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith(PREFIX)) localStorage.removeItem(key);
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key !== null && key.startsWith(PREFIX)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    notifyStorageFailure();
   }
 }

@@ -66,7 +66,7 @@ function FeatureCard({
       <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">{body}</p>
 
       <a
-        href="#"
+        href="/docs/getting-started"
         className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-burgundy-bright"
       >
         Learn more ›

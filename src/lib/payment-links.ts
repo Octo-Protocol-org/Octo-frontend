@@ -2,7 +2,13 @@
 
 "use client";
 
-import { apiFetch } from "./api";
+import { apiFetch, path } from "./api";
+import { parseAmount, toApiStroops } from "./amount";
+import type { AuthToken, WalletId } from "./brands";
+import { pageQuery, type Paginated, type PageOpts } from "./pagination";
+import { isValidEmail } from "./validation";
+
+export { isValidEmail };
 
 export type PaymentLink = {
   id: string;
@@ -20,17 +26,14 @@ export type PaymentLink = {
   url: string;
 };
 
-type Paginated<T> = {
-  data: T[];
-  next_cursor: string | null;
-};
-
-export async function listPaymentLinks(
-  token: string,
-  walletId: string,
+/** First page of payment links up to `limit` rows — name reflects the partial view returned. */
+export async function listRecentPaymentLinks(
+  token: AuthToken,
+  walletId: WalletId,
+  limit = 20,
 ): Promise<PaymentLink[]> {
   const page = await apiFetch<Paginated<PaymentLink>>(
-    `/v1/wallets/${walletId}/payment-links`,
+    path`/v1/wallets/${walletId}/payment-links` + pageQuery({ limit }),
     { token },
   );
   return page.data;
@@ -38,16 +41,12 @@ export async function listPaymentLinks(
 
 /** Paginated payment links, preserving `next_cursor` for page controls. */
 export function listPaymentLinksPage(
-  token: string,
-  walletId: string,
-  opts?: { limit?: number; before?: string | null },
-): Promise<{ data: PaymentLink[]; next_cursor: string | null }> {
-  const params = new URLSearchParams();
-  if (opts?.limit) params.set("limit", String(opts.limit));
-  if (opts?.before) params.set("before", opts.before);
-  const qs = params.toString();
-  return apiFetch<{ data: PaymentLink[]; next_cursor: string | null }>(
-    `/v1/wallets/${walletId}/payment-links${qs ? `?${qs}` : ""}`,
+  token: AuthToken,
+  walletId: WalletId,
+  opts?: PageOpts,
+): Promise<Paginated<PaymentLink>> {
+  return apiFetch<Paginated<PaymentLink>>(
+    path`/v1/wallets/${walletId}/payment-links` + pageQuery(opts),
     { token },
   );
 }
@@ -65,24 +64,20 @@ export type PaymentLinkPayment = {
 };
 
 export function listPaymentLinkPayments(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   linkId: string,
-  opts?: { limit?: number; before?: string | null },
-): Promise<{ data: PaymentLinkPayment[]; next_cursor: string | null }> {
-  const params = new URLSearchParams();
-  if (opts?.limit) params.set("limit", String(opts.limit));
-  if (opts?.before) params.set("before", opts.before);
-  const qs = params.toString();
-  return apiFetch<{ data: PaymentLinkPayment[]; next_cursor: string | null }>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}/payments${qs ? `?${qs}` : ""}`,
+  opts?: PageOpts,
+): Promise<Paginated<PaymentLinkPayment>> {
+  return apiFetch<Paginated<PaymentLinkPayment>>(
+    path`/v1/wallets/${walletId}/payment-links/${linkId}/payments` + pageQuery(opts),
     { token },
   );
 }
 
 export function createPaymentLink(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   params: {
     name: string;
     description?: string;
@@ -91,7 +86,7 @@ export function createPaymentLink(
     amountUsdcStroops?: number;
   },
 ) {
-  return apiFetch<PaymentLink>(`/v1/wallets/${walletId}/payment-links`, {
+  return apiFetch<PaymentLink>(path`/v1/wallets/${walletId}/payment-links`, {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -104,21 +99,25 @@ export function createPaymentLink(
   });
 }
 
-export function getPaymentLink(token: string, walletId: string, linkId: string) {
+export function getPaymentLink(
+  token: AuthToken,
+  walletId: WalletId,
+  linkId: string,
+) {
   return apiFetch<PaymentLink>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}`,
+    path`/v1/wallets/${walletId}/payment-links/${linkId}`,
     { token },
   );
 }
 
 export function setPaymentLinkActive(
-  token: string,
-  walletId: string,
+  token: AuthToken,
+  walletId: WalletId,
   linkId: string,
   active: boolean,
 ) {
   return apiFetch<PaymentLink>(
-    `/v1/wallets/${walletId}/payment-links/${linkId}`,
+    path`/v1/wallets/${walletId}/payment-links/${linkId}`,
     {
       method: "PUT",
       token,
@@ -135,25 +134,31 @@ export type PublicPaymentLink = {
   image_url: string | null;
   redirect_url: string | null;
   amount_usdc_stroops: number | null;
+  /** Backend-enforced minimum for flexible links, in USDC stroops. Falls back to MIN_FLEXIBLE_USD. */
+  min_amount_usdc_stroops?: number | null;
+  /** Optional backend-enforced maximum for flexible links, in USDC stroops. */
+  max_amount_usdc_stroops?: number | null;
   deposit_address: string;
   asset_code: string;
 };
 
 export function getPublicPaymentLink(slug: string) {
-  return apiFetch<PublicPaymentLink>(`/v1/pay/${slug}`);
+  return apiFetch<PublicPaymentLink>(path`/v1/pay/${slug}`);
 }
 
 export type PaymentIntent = {
   payment_id: string;
   deposit_address: string;
   amount_usdc_stroops: number;
+  /** ISO timestamp after which the intent can no longer be paid, when the API provides it. */
+  expires_at?: string | null;
 };
 
 export function createPaymentIntent(
   slug: string,
   params: { payerName?: string; payerEmail?: string; amountUsdcStroops?: number },
 ) {
-  return apiFetch<PaymentIntent>(`/v1/pay/${slug}/intent`, {
+  return apiFetch<PaymentIntent>(path`/v1/pay/${slug}/intent`, {
     method: "POST",
     body: JSON.stringify({
       payer_name: params.payerName || null,
@@ -173,7 +178,7 @@ export type PaymentStatus = {
 };
 
 export function getPaymentStatus(slug: string, paymentId: string) {
-  return apiFetch<PaymentStatus>(`/v1/pay/${slug}/payments/${paymentId}`);
+  return apiFetch<PaymentStatus>(path`/v1/pay/${slug}/payments/${paymentId}`);
 }
 
 export type PublicSigningInfo = {
@@ -187,7 +192,7 @@ export type PublicSigningInfo = {
  * built transaction must use, since that account is the transaction's source. */
 export function getPublicSigningInfo(slug: string, account?: string) {
   const qs = account ? `?account=${encodeURIComponent(account)}` : "";
-  return apiFetch<PublicSigningInfo>(`/v1/pay/${slug}/signing-info${qs}`);
+  return apiFetch<PublicSigningInfo>(path`/v1/pay/${slug}/signing-info` + qs);
 }
 
 export type SubmitPaymentResult = {
@@ -208,7 +213,7 @@ export function submitPublicPayment(
   transactionXdr: string,
   paymentId: string,
 ) {
-  return apiFetch<SubmitPaymentResult>(`/v1/pay/${slug}/submit-signed`, {
+  return apiFetch<SubmitPaymentResult>(path`/v1/pay/${slug}/submit-signed`, {
     method: "POST",
     body: JSON.stringify({
       transaction_xdr: transactionXdr,
@@ -217,19 +222,25 @@ export function submitPublicPayment(
   });
 }
 
-/** Format integer USDC stroops (7 dp) as a decimal string. */
-export function usdcStroopsToAmount(stroops: number): string {
-  return (stroops / 10_000_000).toFixed(7);
-}
-
 /** Parse a decimal USD amount string into integer USDC stroops, or null if invalid. */
 export function usdAmountToStroops(usd: string): number | null {
-  const n = Number(usd);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 10_000_000);
+  return toApiStroops(parseAmount(usd));
 }
 
-/** Basic shape check (not full RFC 5322) — enough to catch typos before submitting. */
-export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+/** Default minimum for flexible-amount links: $0.01 (10,000 stroops). */
+export const MIN_FLEXIBLE_USD = 0.01;
+
+/** Effective min/max (in USDC stroops) for a flexible link, falling back to MIN_FLEXIBLE_USD. */
+export function flexibleAmountBounds(link: PublicPaymentLink): {
+  minStroops: number;
+  maxStroops: number | null;
+} {
+  const minStroops =
+    link.min_amount_usdc_stroops ?? Math.round(MIN_FLEXIBLE_USD * 10_000_000);
+  return {
+    minStroops,
+    maxStroops: link.max_amount_usdc_stroops ?? null,
+  };
 }
+
+

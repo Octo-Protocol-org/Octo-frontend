@@ -1,29 +1,32 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
-import { getWallet, stroopsToAmount, amountToStroops, type WalletView } from "@/lib/wallets";
+import { useWallet } from "@/lib/useWallet";
+import { amountToStroops } from "@/lib/wallets";
 import {
   getSponsorshipConfig,
   updateSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
-import { WalletSidebar } from "@/components/dashboard/WalletSidebar";
-import { DashboardBackground } from "@/components/dashboard/DashboardBackground";
+import { asAuthToken, asWalletId } from "@/lib/brands";
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
-import { ApiError } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { formatStroops } from "@/lib/amount";
+import { BudgetMeter } from "@/components/sponsorship/BudgetMeter";
 
+import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function SponsorshipSettingsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading } = useAuth();
 
-  const [wallet, setWallet] = useState<WalletView | null>(null);
+  const { wallet } = useWallet(id);
   const [config, setConfig] = useState<SponsorshipConfig | null>(null);
 
   // form state (XLM strings, converted to stroops only at the API boundary)
@@ -33,58 +36,73 @@ export default function SponsorshipSettingsPage({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
-    getWallet(token, id).then(setWallet).catch(() => {});
-    getSponsorshipConfig(id, token)
+    const controller = new AbortController();
+    getSponsorshipConfig(asAuthToken(token), asWalletId(id), {
+      signal: controller.signal,
+    })
       .then((c) => {
         setConfig(c);
         setEnabled(c.enabled);
         setMaxFee(
           c.per_tx_fee_cap_stroops != null
-            ? stroopsToAmount(c.per_tx_fee_cap_stroops)
+            ? formatStroops(c.per_tx_fee_cap_stroops)
             : "",
         );
         setDailyBudget(
           c.daily_budget_stroops != null
-            ? stroopsToAmount(c.daily_budget_stroops)
+            ? formatStroops(c.daily_budget_stroops)
             : "",
         );
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        // Surface the failure so the user knows the config didn't load.
+        setError(errorMessage(e, "Could not load sponsorship config."));
+      });
+    return () => controller.abort();
   }, [token, id]);
 
   async function onSave() {
     if (!token) return;
     setError(null);
 
-    const feeStroops = amountToStroops(maxFee);
-    const budgetStroops = amountToStroops(dailyBudget);
+    // Only enforce cap values when enabling — disabling with empty fields must be allowed.
+    if (enabled) {
+      const feeStroops = amountToStroops(maxFee);
+      const budgetStroops = amountToStroops(dailyBudget);
+      if (feeStroops === null || budgetStroops === null) {
+        setError("Enter a max fee and daily budget greater than 0 XLM.");
+        return;
+      }
+      if (feeStroops > budgetStroops) {
+        setError("Max fee per transaction cannot exceed the daily budget.");
+        return;
+      }
+    }
 
-    if (feeStroops === null || budgetStroops === null) {
-      setError("Enter a max fee and daily budget greater than 0 XLM.");
-      return;
-    }
-    if (feeStroops > budgetStroops) {
-      setError("Max fee per transaction cannot exceed the daily budget.");
-      return;
-    }
+    // When disabling, send the existing saved values so the server record stays consistent.
+    const feeStroops = enabled
+      ? amountToStroops(maxFee)
+      : (config?.per_tx_fee_cap_stroops ?? null);
+    const budgetStroops = enabled
+      ? amountToStroops(dailyBudget)
+      : (config?.daily_budget_stroops ?? null);
 
     setSaving(true);
     try {
-      const updated = await updateSponsorshipConfig(id, token, {
+      const updated = await updateSponsorshipConfig(asAuthToken(token), asWalletId(id), {
         enabled,
         per_tx_fee_cap_stroops: feeStroops,
         daily_budget_stroops: budgetStroops,
       });
       setConfig(updated);
-      setToast("Sponsorship settings saved.");
-      setTimeout(() => setToast(null), 3000);
+      toast.success("Sponsorship settings saved.");
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Failed to save settings.",
+        errorMessage(err, "Failed to save settings."),
       );
     } finally {
       setSaving(false);
@@ -99,37 +117,15 @@ export default function SponsorshipSettingsPage({
 
   const spentToday = config?.spent_today_stroops ?? 0;
   const budgetStroops = config?.daily_budget_stroops ?? 0;
-  const remaining = Math.max(0, budgetStroops - spentToday);
-  const pct =
-    budgetStroops > 0
-      ? Math.min(100, Math.round((spentToday / budgetStroops) * 100))
-      : 0;
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
-      <DashboardBackground />
+    <>
+    <WalletPageShell
+      walletId={id}
+      walletName={wallet?.label ?? "Master wallet"}
+      section="Sponsorship"
+    >
 
-      <div className="relative z-10 bg-burgundy/20 py-2 text-center text-xs text-burgundy-bright">
-        You are currently on <strong>test mode</strong> (Stellar testnet).
-      </div>
-      <div className="relative z-10 flex flex-1">
-        <WalletSidebar walletId={id} walletName={wallet?.label ?? "Master wallet"} />
-
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border px-8 py-4">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Link href="/dashboard" className="hover:text-foreground">
-                My Wallets
-              </Link>
-              <span>›</span>
-              <span className="text-foreground">Sponsorship</span>
-            </div>
-            <button onClick={logout} className="text-sm text-muted hover:text-foreground">
-              ⏻
-            </button>
-          </header>
-
-          <main className="flex-1 px-8 py-8">
             <div className="mx-auto max-w-2xl space-y-6">
               <div>
                 <h1 className="text-xl font-semibold text-foreground">
@@ -142,24 +138,10 @@ export default function SponsorshipSettingsPage({
               </div>
 
               {/* Today's spend */}
-              <section className="rounded-2xl border border-border bg-burgundy-soft/30 p-5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted">Today&apos;s spend</span>
-                  <span className="text-foreground">
-                    {stroopsToAmount(spentToday)} XLM spent of{" "}
-                    {stroopsToAmount(budgetStroops)} XLM daily budget
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-hover">
-                  <div
-                    className="h-full rounded-full bg-burgundy-bright"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted">
-                  {stroopsToAmount(remaining)} XLM remaining today
-                </p>
-              </section>
+              <BudgetMeter
+                spentTodayStroops={spentToday}
+                dailyBudgetStroops={config?.daily_budget_stroops ?? null}
+              />
 
               {/* Settings form */}
               <section className="space-y-5 rounded-2xl border border-border bg-burgundy-soft/30 p-5">
@@ -230,8 +212,8 @@ export default function SponsorshipSettingsPage({
                     className="mt-1.5 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
                   />
                   <p className="mt-1 text-xs text-muted">
-                    {stroopsToAmount(remaining)} XLM remaining of today&apos;s
-                    budget.
+                    {formatStroops(Math.max(0, budgetStroops - spentToday))} XLM
+                    remaining of today&apos;s budget.
                   </p>
                 </div>
 
@@ -254,15 +236,8 @@ export default function SponsorshipSettingsPage({
                 <SponsoredTransactionsTable walletId={id} token={token} />
               )}
             </div>
-          </main>
-        </div>
-      </div>
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 rounded-xl border border-burgundy/40 bg-burgundy/20 px-4 py-3 text-sm text-burgundy-bright shadow-lg">
-          ✓ {toast}
-        </div>
-      )}
-    </div>
+    </WalletPageShell>
+  </>
   );
 }

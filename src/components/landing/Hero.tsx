@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { network } from "@/lib/network";
+
 export function Hero() {
   return (
     <section className="relative overflow-hidden px-4 pt-20 pb-16 sm:pt-28">
@@ -68,7 +70,7 @@ function DashboardPreview() {
           </div>
           <div className="mt-2 flex items-center gap-2 px-3 text-xs text-muted">
             <span className="h-2 w-2 rounded-full bg-burgundy-bright" />
-            Stellar · Testnet
+            Stellar · {network.displayName}
           </div>
           <nav className="mt-6 space-y-1 text-sm">
             {["Overview", "Assets", "Transactions", "Addresses", "Developers"].map(

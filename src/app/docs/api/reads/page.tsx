@@ -1,3 +1,5 @@
+export const metadata = { title: "Reads API — Octo" };
+
 import { Prose, Code, Endpoint } from "@/components/docs/DocsUI";
 
 export default function ApiReads() {

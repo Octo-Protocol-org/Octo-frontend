@@ -1,23 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 // Copy-to-clipboard button; swaps to a checkmark for a moment after a successful copy.
 export function CopyButton({
   value,
   label = "Copy",
   className = "text-muted hover:text-foreground",
+  sensitive = false,
 }: {
   value: string;
   label?: string;
   className?: string;
+  /** Best-effort: clear the clipboard 60s after copying (cannot remove OS clipboard-history entries). */
+  sensitive?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingValue = useRef<string | null>(null);
+
+  async function clearClipboard(v: string) {
+    try {
+      let matches = true;
+      try {
+        matches = (await navigator.clipboard.readText()) === v;
+      } catch {
+        // Reading not permitted: overwrite anyway.
+      }
+      if (matches) await navigator.clipboard.writeText("");
+    } catch {
+      // Best effort only.
+    }
+  }
+
+  useEffect(
+    () => () => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+      if (pendingValue.current !== null) void clearClipboard(pendingValue.current);
+    },
+    [],
+  );
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      if (sensitive) {
+        if (clearTimer.current) clearTimeout(clearTimer.current);
+        pendingValue.current = value;
+        clearTimer.current = setTimeout(() => {
+          const v = pendingValue.current;
+          pendingValue.current = null;
+          clearTimer.current = null;
+          if (v !== null) void clearClipboard(v);
+        }, 60_000);
+        toast.success("Copied. The clipboard will be cleared in 60s.");
+      }
+    } catch {
+      toast.error("Copy failed — select and copy manually");
+    }
   }
 
   return (

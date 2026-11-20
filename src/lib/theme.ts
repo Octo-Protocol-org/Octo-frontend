@@ -10,10 +10,10 @@ export const DEFAULT_THEME: Theme = "dark";
 /**
  * Stamps `data-theme` on <html> before first paint so no page ever flashes the wrong theme.
  *
- * This must run as a blocking inline script in <head>, which the strict nonce CSP on
- * /dashboard/wallets/* would otherwise block. Rather than read the nonce in the root layout —
- * which would force every route into dynamic rendering and defeat the static prerendering that
- * CSP split exists to preserve — its SHA-256 is allowlisted directly in `src/proxy.ts`.
+ * This must run as a blocking inline script in <head>, which the strict CSP on
+ * /dashboard/wallets/* would otherwise block. It is allowlisted by its SHA-256 hash in
+ * `src/proxy.ts`; the root layout never reads a nonce, so every route stays statically
+ * prerendered.
  *
  * Any edit here changes that hash. `theme.test.ts` recomputes it and fails if the two drift.
  */

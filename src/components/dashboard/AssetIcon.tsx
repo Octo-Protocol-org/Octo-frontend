@@ -1,4 +1,8 @@
-import { USDC_TESTNET } from "@/lib/wallets";
+import { NETWORK_CONFIGS } from "@/lib/network";
+
+const KNOWN_USDC_ISSUERS = new Set(
+  Object.values(NETWORK_CONFIGS).map((c) => c.usdc.issuer),
+);
 
 // The white disc is each asset mark's own backdrop — the glyphs are solid black, so it stays
 // white in both themes rather than following the surface tokens.
@@ -45,7 +49,7 @@ export function AssetIcon({
   className?: string;
 }) {
   if (isNative) return <XlmIcon className={className} />;
-  if (code === USDC_TESTNET.code && issuer === USDC_TESTNET.issuer) {
+  if (code === "USDC" && issuer && KNOWN_USDC_ISSUERS.has(issuer)) {
     return <UsdcIcon className={className} />;
   }
   return (

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { AuthUnderwater } from "@/components/auth/AuthUnderwater";
+import { network } from "@/lib/network";
 
 /**
  * The auth page's "live wallet" scene: a small wallet dashboard card the
@@ -53,7 +54,7 @@ export function AuthWalletScene() {
             </span>
             <span className="flex items-center gap-1.5 text-[11px] text-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-burgundy-bright" />
-              Stellar · Testnet
+              Stellar · {network.displayName}
             </span>
           </div>
           <span

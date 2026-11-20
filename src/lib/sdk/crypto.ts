@@ -10,7 +10,21 @@
  */
 
 const PBKDF2_ITERATIONS = 600_000;
+const MIN_ITERATIONS = 600_000;
+const MAX_ITERATIONS = 10_000_000;
 const KEY_LENGTH_BITS = 256;
+const SALT_BYTES = 16;
+const NONCE_BYTES = 12;
+
+const MALFORMED_BACKUP = "Malformed or unrecognized backup.";
+
+/** Thrown by `decryptSeed` when the password is wrong (or the ciphertext was tampered with). */
+export class WrongPasswordError extends Error {
+  constructor() {
+    super("Incorrect password or corrupted backup.");
+    this.name = "WrongPasswordError";
+  }
+}
 
 export type EncryptedBackup = {
   /** Format version, for forward-compatibility. */
@@ -72,8 +86,8 @@ export async function encryptSeed(
   plaintext: string,
   password: string,
 ): Promise<EncryptedBackup> {
-  const salt = randomBytes(16);
-  const nonce = randomBytes(12);
+  const salt = randomBytes(SALT_BYTES);
+  const nonce = randomBytes(NONCE_BYTES);
   const key = await deriveKey(password, salt, PBKDF2_ITERATIONS);
   const ptBytes = new TextEncoder().encode(plaintext) as Uint8Array<ArrayBuffer>;
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, ptBytes);
@@ -92,6 +106,7 @@ export async function decryptSeed(
   backup: EncryptedBackup,
   password: string,
 ): Promise<string> {
+  assertValidBackup(backup);
   const salt = fromB64(backup.salt);
   const nonce = fromB64(backup.nonce);
   const key = await deriveKey(password, salt, backup.iter);
@@ -103,7 +118,7 @@ export async function decryptSeed(
       fromB64(backup.ciphertext),
     );
   } catch {
-    throw new Error("Incorrect password or corrupted backup.");
+    throw new WrongPasswordError();
   }
   return new TextDecoder().decode(plain);
 }
@@ -113,11 +128,48 @@ export function serializeBackup(backup: EncryptedBackup): string {
   return JSON.stringify(backup);
 }
 
-/** Parse a backup blob string; throws if malformed. */
-export function parseBackup(s: string): EncryptedBackup {
-  const b = JSON.parse(s) as EncryptedBackup;
-  if (b.v !== 1 || b.kdf !== "PBKDF2-SHA256" || !b.salt || !b.nonce || !b.ciphertext) {
-    throw new Error("Unrecognized backup format.");
+/** AES-GCM tag (16 bytes) plus bounds for a mnemonic of up to 24 words. */
+const MIN_CIPHERTEXT_BYTES = 17;
+const MAX_CIPHERTEXT_BYTES = 1024;
+
+/** Validate KDF parameters and field sizes; throws on anything out of range. */
+export function assertValidBackup(b: unknown): asserts b is EncryptedBackup {
+  const x = b as EncryptedBackup | null;
+  if (!x || typeof x !== "object" || x.v !== 1 || x.kdf !== "PBKDF2-SHA256") {
+    throw new Error(MALFORMED_BACKUP);
   }
+  if (typeof x.iter !== "number" || !Number.isInteger(x.iter) || x.iter < MIN_ITERATIONS || x.iter > MAX_ITERATIONS) {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (typeof x.salt !== "string" || typeof x.nonce !== "string" || typeof x.ciphertext !== "string") {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  let salt: Uint8Array;
+  let nonce: Uint8Array;
+  let ct: Uint8Array;
+  try {
+    salt = fromB64(x.salt);
+    nonce = fromB64(x.nonce);
+    ct = fromB64(x.ciphertext);
+  } catch {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (salt.length !== SALT_BYTES || nonce.length !== NONCE_BYTES) {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  if (ct.length < MIN_CIPHERTEXT_BYTES || ct.length > MAX_CIPHERTEXT_BYTES) {
+    throw new Error(MALFORMED_BACKUP);
+  }
+}
+
+/** Parse a backup blob string; throws if malformed or if KDF parameters are out of range. */
+export function parseBackup(s: string): EncryptedBackup {
+  let b: unknown;
+  try {
+    b = JSON.parse(s);
+  } catch {
+    throw new Error(MALFORMED_BACKUP);
+  }
+  assertValidBackup(b);
   return b;
 }

@@ -16,6 +16,15 @@ const COLUMNS = [
   },
 ];
 
+// Real destinations for each footer link; anything unlisted falls back to the docs home.
+const LINKS: Record<string, string> = {
+  Documentation: "/docs",
+  "API Reference": "/docs/api",
+  "Security Overview": "/docs/security",
+  "Contact Sales": "/#demo",
+  "About Us": "/#company",
+};
+
 export function Footer() {
   return (
     <footer id="company" className="border-t border-border px-4 py-16">
@@ -43,7 +52,7 @@ export function Footer() {
               {col.links.map((l) => (
                 <li key={l}>
                   <Link
-                    href="#"
+                    href={LINKS[l] ?? "/docs"}
                     className="text-sm text-muted transition-colors hover:text-foreground"
                   >
                     {l}

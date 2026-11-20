@@ -1,8 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/components/CopyButton";
+import { useFocusTrap } from "@/lib/useFocusTrap";
+
+// Open modals, outermost first. Only the top one handles Escape and traps Tab.
+const modalStack: string[] = [];
+const stackListeners = new Set<() => void>();
+
+function notifyStack() {
+  stackListeners.forEach((listener) => listener());
+}
+
+function subscribeStack(listener: () => void) {
+  stackListeners.add(listener);
+  return () => {
+    stackListeners.delete(listener);
+  };
+}
+
+function useIsTopModal(id: string) {
+  return useSyncExternalStore(
+    subscribeStack,
+    () => modalStack[modalStack.length - 1] === id,
+    () => false,
+  );
+}
 
 export function Modal({
   title,
@@ -13,15 +37,50 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const isTop = useIsTopModal(titleId);
+  useFocusTrap(panelRef, isTop);
+
+  useEffect(() => {
+    modalStack.push(titleId);
+    notifyStack();
+    return () => {
+      modalStack.splice(modalStack.indexOf(titleId), 1);
+      notifyStack();
+    };
+  }, [titleId]);
+
+  // Escape closes, matching native dialog behaviour for keyboard users. Only the top modal reacts.
+  useEffect(() => {
+    if (!isTop) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isTop, onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       <div
         className="absolute inset-0 bg-scrim backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-burgundy-soft/40 p-6 shadow-2xl">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-burgundy-soft/40 p-6 shadow-2xl outline-none"
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-foreground">
+            {title}
+          </h3>
           <button
             onClick={onClose}
             className="text-muted hover:text-foreground"
@@ -33,6 +92,52 @@ export function Modal({
         <div className="mt-5">{children}</div>
       </div>
     </div>
+  );
+}
+
+/** Confirmation dialog for destructive or risky actions — a deliberate second step
+ * instead of window.confirm, so the risk can be explained in-context. */
+export function ConfirmModal({
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  destructive = false,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <div className="text-sm text-muted">{message}</div>
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-sunken"
+        >
+          {cancelLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className={
+            destructive
+              ? "rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              : "rounded-lg bg-burgundy-bright px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          }
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -82,5 +187,25 @@ export function CopyField({
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Renders a full, untruncated address with its first and last characters highlighted so a
+ * user can eyeball the ends against clipboard-hijacking malware before signing. */
+export function HighlightedAddress({ address }: { address: string }) {
+  if (address.length <= 2) {
+    return <span className="font-mono text-xs text-foreground">{address}</span>;
+  }
+
+  return (
+    <span className="break-all font-mono text-xs text-foreground">
+      <span className="rounded bg-burgundy-bright/20 px-0.5 font-semibold text-burgundy-bright">
+        {address.slice(0, 4)}
+      </span>
+      {address.slice(4, -4)}
+      <span className="rounded bg-burgundy-bright/20 px-0.5 font-semibold text-burgundy-bright">
+        {address.slice(-4)}
+      </span>
+    </span>
   );
 }

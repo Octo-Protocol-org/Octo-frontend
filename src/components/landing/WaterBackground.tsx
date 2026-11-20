@@ -341,6 +341,7 @@ export function WaterBackground() {
       // bubbles
       for (let i = 0; i < bubbles.length; i++) {
         const b = bubbles[i];
+        if (!b) continue;
         b.y -= b.speed * dt;
         b.x += Math.sin(time + b.phase) * b.drift * dt;
         if (b.y + b.r < 0) bubbles[i] = spawnBubble(true);

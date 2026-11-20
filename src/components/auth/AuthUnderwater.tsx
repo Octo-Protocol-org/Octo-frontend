@@ -490,6 +490,7 @@ export function AuthUnderwater({ targetRef, onDeposit }: AuthUnderwaterProps) {
       // bubbles
       for (let i = 0; i < bubbles.length; i++) {
         const b = bubbles[i];
+        if (!b) continue;
         b.y -= b.speed * dt;
         b.x += Math.sin(time + b.phase) * 8 * dt;
         if (b.y + b.r < 0) bubbles[i] = spawnBubble(true);
@@ -555,6 +556,7 @@ export function AuthUnderwater({ targetRef, onDeposit }: AuthUnderwaterProps) {
       // security rings (encryption pulse) around the wallet
       for (let i = rings.length - 1; i >= 0; i--) {
         const rg = rings[i];
+        if (!rg) continue;
         rg.r += 90 * dt;
         rg.life -= dt / 1.1;
         if (rg.life <= 0) {

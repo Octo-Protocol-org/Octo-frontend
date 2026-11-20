@@ -62,7 +62,7 @@ export function UseCases() {
               <p className="mt-3 text-sm leading-relaxed text-muted">{c.body}</p>
               {!("soon" in c && c.soon) && (
                 <a
-                  href="#"
+                  href="/docs/getting-started"
                   className="mt-5 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-burgundy-bright"
                 >
                   Read more ›

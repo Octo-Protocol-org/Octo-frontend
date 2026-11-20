@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemedToaster } from "@/components/ThemedToaster";
+import { StorageWarningToast } from "@/components/StorageWarningToast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -39,13 +40,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Blocking, before first paint — otherwise every load flashes the default theme first. */}
+        {/* Blocking, before first paint — allowlisted by the SHA-256 hash in the proxy, so routes stay static. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
           {children}
           <ThemedToaster />
+          <StorageWarningToast />
         </ThemeProvider>
       </body>
     </html>
