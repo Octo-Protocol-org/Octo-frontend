@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { useWallet } from "@/lib/useWallet";
 import {
@@ -18,6 +18,9 @@ import { toast } from "sonner";
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export const dynamic = "force-dynamic";
 
+/** How long (ms) a generated key stays visible before it is auto-cleared. */
+const KEY_DISPLAY_TIMEOUT_MS = 10 * 60 * 1000;
+
 export default function DevelopersPage({
   params,
 }: {
@@ -33,6 +36,10 @@ export default function DevelopersPage({
   const [generating, setGenerating] = useState(false);
   const [confirmingRegen, setConfirmingRegen] = useState(false);
   const [keyLoadFailed, setKeyLoadFailed] = useState(false);
+  // Seconds remaining before the key is auto-cleared.
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -45,6 +52,47 @@ export default function DevelopersPage({
       });
     return () => controller.abort();
   }, [token, id]);
+
+  // Auto-mask when the tab is hidden (screen-share / idle protection).
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") setRevealed(false);
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  // Start the 10-minute clear countdown whenever a new key is generated.
+  useEffect(() => {
+    if (!fullKey) return;
+    const expiresAt = Date.now() + KEY_DISPLAY_TIMEOUT_MS;
+    setSecondsLeft(Math.ceil(KEY_DISPLAY_TIMEOUT_MS / 1000));
+
+    // Tick every second to update the countdown display.
+    tickRef.current = setInterval(() => {
+      const left = Math.ceil((expiresAt - Date.now()) / 1000);
+      setSecondsLeft(Math.max(0, left));
+    }, 1000);
+
+    // Clear the key after the timeout.
+    clearTimerRef.current = setTimeout(() => {
+      setFullKey(null);
+      setRevealed(false);
+    }, KEY_DISPLAY_TIMEOUT_MS);
+
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
+  }, [fullKey]);
+
+  // Also clear on unmount — the key must not persist if the user navigates away.
+  useEffect(() => {
+    return () => {
+      setFullKey(null);
+      setRevealed(false);
+    };
+  }, []);
 
   // Until key status is known we can't tell "generate" from "regenerate", so block the action.
   function onGenerateClick() {
@@ -76,6 +124,9 @@ export default function DevelopersPage({
       <PageSpinner />
     );
   }
+
+  // Format countdown as mm:ss for the banner.
+  const countdownDisplay = `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}`;
 
   // What to display in the API key row.
   const keyDisplay = fullKey
@@ -130,6 +181,10 @@ export default function DevelopersPage({
                     This is your API key — copy it now. It won&apos;t be shown
                     again. Store it securely and never commit it to source
                     control.
+                  </p>
+                  <p className="mt-2 text-xs text-muted">
+                    Auto-clears in{" "}
+                    <span className="font-mono text-foreground">{countdownDisplay}</span>
                   </p>
                   <button
                     type="button"
