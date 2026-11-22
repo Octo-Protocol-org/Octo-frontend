@@ -20,6 +20,7 @@ import {
   me,
   broadcastLogout,
   subscribeToLogout,
+  TOKEN_KEY,
   type User,
 } from "./auth";
 
@@ -143,7 +144,7 @@ function useAuthSession() {
 
     // Sign out when another tab removes the token from storage.
     function onStorage(e: StorageEvent) {
-      if (e.key === "octo_token" && e.newValue === null) {
+      if (e.key === TOKEN_KEY && e.newValue === null) {
         onSignOut("remote");
       }
     }

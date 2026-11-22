@@ -29,6 +29,8 @@ export function WalletProvider({ walletId, children }: { walletId: string; child
       return;
     }
 
+    // Reset wallet immediately so stale data from the previous wallet is never shown.
+    setWallet(null);
     setLoading(true);
     setError(null);
     getWallet(token, walletId, { signal: controller.signal })
