@@ -100,4 +100,17 @@ describe("sep7PayUri", () => {
     expect(params.get("memo")).toBe("hello world");
     expect(params.get("memo_type")).toBe("MEMO_TEXT");
   });
+
+  it("round-trips a full uint64 memo ID string into the SEP-7 URI unchanged", () => {
+    // uint64 max — would be rounded to the wrong value if passed through a JS number
+    const uint64Max = "18446744073709551615";
+    const uri = sep7PayUri({
+      destination: DESTINATION,
+      memoId: uint64Max,
+      networkPassphrase: TESTNET_PASSPHRASE,
+    });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.get("memo")).toBe(uint64Max);
+    expect(params.get("memo_type")).toBe("MEMO_ID");
+  });
 });

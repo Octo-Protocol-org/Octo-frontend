@@ -6,7 +6,9 @@ import { apiFetch, path } from "./api";
 import { parseAmount, toApiStroops } from "./amount";
 import { pageQuery, type Paginated, type PageOpts } from "./pagination";
 import { fetchAllPages } from "./csv";
+import type { MemoId, Stroops } from "./brands";
 export { usdcForNetwork } from "./network";
+export type { MemoId, Stroops } from "./brands";
 
 export type { Paginated, PageOpts } from "./pagination";
 type RequestOptions = { signal?: AbortSignal };
@@ -41,14 +43,17 @@ export type Address = {
   customer_ref: string | null;
   muxed_address: string;
   base_address: string;
-  memo_id: number;
+  /** Stellar memo ID (uint64) serialised as a decimal string to avoid JS number precision loss. */
+  memo_id: MemoId;
   metadata: unknown;
   /**
    * Lifetime total (stroops) of confirmed deposits credited to this address. Historical
    * bookkeeping, not a live balance — deposits always land in the wallet's single master
    * account (that's the point of muxed addresses; there is nothing to sweep per-address).
+   *
+   * Serialised as a decimal string; use `formatStroops` / `sumStroops` for display/arithmetic.
    */
-  received_stroops: number;
+  received_stroops: Stroops;
 };
 
 export type Transaction = {
@@ -63,7 +68,8 @@ export type Transaction = {
   asset_code: string;
   /** Present for credit assets (e.g. USDC); null for native XLM. */
   asset_issuer: string | null;
-  amount_stroops: number;
+  /** Serialised as a decimal string; use `formatStroops` for display. */
+  amount_stroops: Stroops;
   source_account: string | null;
   destination_account: string | null;
   stellar_tx_hash: string | null;
@@ -71,8 +77,8 @@ export type Transaction = {
   status: string;
   /** Stellar ledger sequence the transaction was included in, if known. */
   ledger: number | null;
-  /** Numeric memo id, for the G...+memo deposit-attribution fallback. */
-  memo_id: number | null;
+  /** Numeric memo id for the G...+memo deposit-attribution fallback, as a decimal string. */
+  memo_id: MemoId | null;
   created_at: string;
 };
 

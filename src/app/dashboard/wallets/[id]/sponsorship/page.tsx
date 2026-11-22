@@ -10,11 +10,11 @@ import {
   updateSponsorshipConfig,
   type SponsorshipConfig,
 } from "@/lib/sponsorship";
-import { asAuthToken, asWalletId } from "@/lib/brands";
+import { asAuthToken, asWalletId, type Stroops } from "@/lib/brands";
 import { SponsoredTransactionsTable } from "@/components/dashboard/SponsoredTransactionsTable";
 import { errorMessage } from "@/lib/api";
 import { PageSpinner } from "@/components/OctoSpinner";
-import { formatStroops } from "@/lib/amount";
+import { formatStroops, sumStroops } from "@/lib/amount";
 import { BudgetMeter } from "@/components/sponsorship/BudgetMeter";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
@@ -84,11 +84,11 @@ export default function SponsorshipSettingsPage({
     }
 
     // When disabling, send the existing saved values so the server record stays consistent.
-    const feeStroops = enabled
-      ? amountToStroops(maxFee)
+    const feeStroops: Stroops | null = enabled
+      ? (amountToStroops(maxFee) !== null ? String(amountToStroops(maxFee)) as Stroops : null)
       : (config?.per_tx_fee_cap_stroops ?? null);
-    const budgetStroops = enabled
-      ? amountToStroops(dailyBudget)
+    const budgetStroops: Stroops | null = enabled
+      ? (amountToStroops(dailyBudget) !== null ? String(amountToStroops(dailyBudget)) as Stroops : null)
       : (config?.daily_budget_stroops ?? null);
 
     setSaving(true);
@@ -115,8 +115,13 @@ export default function SponsorshipSettingsPage({
     );
   }
 
-  const spentToday = config?.spent_today_stroops ?? 0;
-  const budgetStroops = config?.daily_budget_stroops ?? 0;
+  const spentToday: Stroops | number = config?.spent_today_stroops ?? 0;
+  const budgetStroops: Stroops | number = config?.daily_budget_stroops ?? 0;
+  const remainingDisplay = formatStroops(
+    sumStroops([budgetStroops]) > sumStroops([spentToday])
+      ? sumStroops([budgetStroops]) - sumStroops([spentToday])
+      : BigInt(0),
+  );
 
   return (
     <>
@@ -212,7 +217,7 @@ export default function SponsorshipSettingsPage({
                     className="mt-1.5 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
                   />
                   <p className="mt-1 text-xs text-muted">
-                    {formatStroops(Math.max(0, budgetStroops - spentToday))} XLM
+                    {remainingDisplay} XLM
                     remaining of today&apos;s budget.
                   </p>
                 </div>

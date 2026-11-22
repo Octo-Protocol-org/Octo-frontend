@@ -89,7 +89,7 @@ export default function PaymentLinksPage({
 
   const totalCollected = sumStroops(links.map((l) => l.collected_usdc_stroops));
   const activeCount = links.filter((l) => l.active).length;
-  const paidLinks = links.filter((l) => l.collected_usdc_stroops > 0);
+  const paidLinks = links.filter((l) => sumStroops([l.collected_usdc_stroops]) > BigInt(0));
   const avgPayment = paidLinks.length > 0 ? totalCollected / BigInt(paidLinks.length) : BigInt(0);
 
   if (loading || !user) {

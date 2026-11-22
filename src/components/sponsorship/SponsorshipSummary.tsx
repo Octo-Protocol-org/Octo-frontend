@@ -12,7 +12,7 @@ export function SponsorshipSummary({
   className,
 }: SponsorshipSummaryProps) {
   const perTransactionFeeCapStroops = config?.per_tx_fee_cap_stroops ?? null;
-  const spentTodayStroops = config?.spent_today_stroops ?? 0;
+  const spentTodayStroops: import("@/lib/brands").Stroops | number = config?.spent_today_stroops ?? 0;
   const dailyBudgetStroops = config?.daily_budget_stroops ?? null;
 
   const isDisabled = !config || config.enabled === false;
