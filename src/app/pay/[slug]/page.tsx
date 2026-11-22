@@ -23,9 +23,8 @@ import { buildUnsignedPayment, assertNetworkConsistency } from "@/lib/sdk";
 import { assertSignedMatchesBuilt } from "@/lib/sdk/signedTxCheck";
 import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
-import confetti from "canvas-confetti";
 import { formatStroops, parseAmount } from "@/lib/amount";
-import { explorerTxUrl } from "@/lib/explorer";
+import { explorerTxUrl } from "@/lib/network";
 import { ApiError, errorMessage } from "@/lib/api";
 import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
@@ -73,7 +72,9 @@ function intentInputsKey(amountUsdcStroops: number, name: string, email: string)
   return JSON.stringify([amountUsdcStroops, name, email.toLowerCase()]);
 }
 
-function celebrate() {
+// Loaded on demand: checkout is the most latency-sensitive page and confetti runs once, after success.
+async function celebrate() {
+  const { default: confetti } = await import("canvas-confetti");
   confetti({
     particleCount: 140,
     spread: 80,

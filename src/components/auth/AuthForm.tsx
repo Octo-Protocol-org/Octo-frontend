@@ -207,7 +207,7 @@ export function AuthForm({
         <div className="my-7 h-px bg-border" />
 
         <form onSubmit={onVerify} className="space-y-5">
-          <OtpInput value={code} onChange={setCode} disabled={loading} aria-describedby={error ? "verify-error" : undefined} aria-invalid={error ? "true" : "false"} />
+          <OtpInput value={code} onChange={setCode} disabled={loading} label="Email verification code" aria-describedby={error ? "verify-error" : undefined} aria-invalid={error ? "true" : "false"} />
 
           {error && (
             <p id="verify-error" role="alert" className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
