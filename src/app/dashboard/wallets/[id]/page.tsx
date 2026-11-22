@@ -36,6 +36,7 @@ import { EditWalletDetails } from "@/components/wallets/EditWalletDetails";
 import { NewAddressModal } from "@/components/addresses/CustomerReferenceField";
 import { RelativeTime } from "@/components/RelativeTime";
 import { Skeleton, TableRowSkeleton } from "@/components/Skeleton";
+import { isPhraseConfirmed } from "@/lib/phraseConfirmation";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
 export default function WalletOverview({
@@ -189,6 +190,12 @@ export default function WalletOverview({
                   ]).finally(() => setStatsLoading(false));
                 }
               }} />
+            )}
+            {!isPhraseConfirmed(id) && (
+              <div role="alert" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+                ⚠ You haven&apos;t confirmed your recovery phrase for this wallet. If you forget your encryption password without it, the funds will be unrecoverable.
+                Use <strong>Recover wallet</strong> to view and confirm the phrase with your password.
+              </div>
             )}
             {/* header */}
             <div>              <h1 className="text-2xl font-semibold text-foreground">

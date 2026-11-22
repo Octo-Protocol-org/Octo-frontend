@@ -31,6 +31,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MAX_WALLET_DESCRIPTION, MAX_WALLET_LABEL } from "@/lib/walletDetailsApi";
 import { ConfirmModal } from "@/components/dashboard/Modal";
 import { PageSpinner } from "@/components/OctoSpinner";
+import { markPhraseConfirmed } from "@/lib/phraseConfirmation";
 
 /** How many phrase words the user must re-enter to prove they saved it. */
 const VERIFY_WORD_COUNT = 3;
@@ -192,6 +193,7 @@ export function NewWalletClient() {
   }
 
   function onVerified() {
+    markPhraseConfirmed(created!.wallet.id);
     setVerified(true);
     router.push("/dashboard");
   }

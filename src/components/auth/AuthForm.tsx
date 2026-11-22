@@ -30,6 +30,7 @@ export function AuthForm({
   const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [userId, setUserId] = useState("");
   const [challengeId, setChallengeId] = useState("");
   const [code, setCode] = useState("");
@@ -70,10 +71,17 @@ export function AuthForm({
       setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
-    if (isSignup) { const a = await assessPassword(password, [normalizedEmail]); if (a.score < MIN_PASSWORD_SCORE) {
-      setError("Please choose a stronger password.");
-      return;
-    }}
+    if (isSignup) {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      const a = await assessPassword(password, [normalizedEmail]);
+      if (a.score < MIN_PASSWORD_SCORE) {
+        setError("Please choose a stronger password.");
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -300,6 +308,29 @@ export function AuthForm({
           {!isSignup && <Link href="/forgot-password" className="mt-2 inline-block text-xs text-muted hover:text-foreground">Forgot password?</Link>}
         </div>
 
+        {isSignup && (
+          <div>
+            <label htmlFor="confirm-password-input" className="text-sm font-medium text-foreground">Confirm Password</label>
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 focus-within:border-burgundy-bright">
+              <span className="text-muted"></span>
+              <input
+                id="confirm-password-input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat your password"
+                autoComplete="new-password"
+                aria-invalid={error && password !== confirmPassword ? "true" : "false"}
+                aria-describedby={error ? "auth-error" : undefined}
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted/60 focus:outline-none"
+              />
+            </div>
+            {confirmPassword && password !== confirmPassword && (
+              <p className="mt-1 text-xs text-burgundy-bright">Passwords do not match.</p>
+            )}
+          </div>
+        )}
+
         {error && (
           <p id="auth-error" role="alert" className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
             {error}
@@ -308,7 +339,7 @@ export function AuthForm({
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (isSignup && password !== confirmPassword && confirmPassword.length > 0)}
           className="glass-btn-primary w-full rounded-xl py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Please wait…" : isSignup ? "Continue" : "Sign in"}

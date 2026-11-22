@@ -38,19 +38,32 @@ export function DownloadBackupButton({
   async function download() {
     setBusy(true);
     try {
-      // Prefer the local copy; fall back to the server-held blob.
-      const cached = loadLocalBackup(walletId);
-      let backup = cached?.backup ?? null;
-      if (!backup) {
+      // Always fetch the authoritative server copy; fall back to the local cache only if the
+      // request fails, and warn the user that the offline copy may be stale.
+      let backup = null;
+      let offlineFallback = false;
+      try {
         const remote = await getBackup(token, walletId);
         if (!remote.encrypted_backup) throw new Error("No encrypted backup found for this wallet.");
         backup = parseBackup(remote.encrypted_backup);
+        // Refresh the local cache with the server-authoritative copy.
+        saveLocalBackup(walletId, backup, remote.backup_version ?? remote.encrypted_backup);
+      } catch {
+        const cached = loadLocalBackup(walletId);
+        if (!cached?.backup) throw new Error("Could not reach the server and no local backup is cached.");
+        backup = cached.backup;
+        offlineFallback = true;
       }
-      const file = { wallet_id: walletId, address, backup };
+      const exportedAt = new Date().toISOString();
+      const file = { wallet_id: walletId, address, exported_at: exportedAt, backup };
+      const filename = `octo-backup-${(address ?? walletId).slice(0, 8)}.json`;
       downloadBlob(
-        `octo-backup-${(address ?? walletId).slice(0, 8)}.json`,
+        filename,
         new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }),
       );
+      if (offlineFallback) {
+        toast.warning("Offline copy downloaded — may not reflect a recent password change.");
+      }
     } catch (err) {
       toast.error(errorMessage(err, "Could not download the backup."));
     } finally {
