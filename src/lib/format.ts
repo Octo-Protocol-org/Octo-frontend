@@ -32,6 +32,5 @@ export function shortenTxHash(hash: string): string {
 
 /** Stellar Expert transaction URL for the current network. */
 export function explorerTxUrl(hash: string): string {
-  const net = network === "mainnet" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${net}/tx/${encodeURIComponent(hash.trim())}`;
+  return `${network.explorerBase}/tx/${encodeURIComponent(hash.trim())}`;
 }

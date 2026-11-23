@@ -1,3 +1,5 @@
+import { NETWORK_CONFIGS } from "./network";
+
 /** Build a SEP-7 `web+stellar:pay` URI. */
 export function sep7PayUri(p: {
   destination: string;
@@ -34,7 +36,9 @@ export function sep7PayUri(p: {
     }
   }
 
-  if (p.networkPassphrase) {
+  // The public network is the SEP-7 default, so only a non-default passphrase needs stating.
+  const mainnetPassphrase = NETWORK_CONFIGS.mainnet?.passphrase;
+  if (p.networkPassphrase && p.networkPassphrase !== mainnetPassphrase) {
     q.set("network_passphrase", p.networkPassphrase);
   }
 

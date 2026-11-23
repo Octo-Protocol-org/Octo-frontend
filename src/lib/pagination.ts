@@ -8,6 +8,8 @@ export type Paginated<T> = {
 export type PageOpts = {
   limit?: number;
   before?: string | null;
+  /** Aborts the underlying request (used by long-running full exports). */
+  signal?: AbortSignal;
 };
 
 export function pageQuery(opts?: PageOpts): string {

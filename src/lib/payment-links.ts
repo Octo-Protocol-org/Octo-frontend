@@ -47,7 +47,7 @@ export function listPaymentLinksPage(
 ): Promise<Paginated<PaymentLink>> {
   return apiFetch<Paginated<PaymentLink>>(
     path`/v1/wallets/${walletId}/payment-links` + pageQuery(opts),
-    { token },
+    { token, signal: opts?.signal },
   );
 }
 
@@ -71,7 +71,7 @@ export function listPaymentLinkPayments(
 ): Promise<Paginated<PaymentLinkPayment>> {
   return apiFetch<Paginated<PaymentLinkPayment>>(
     path`/v1/wallets/${walletId}/payment-links/${linkId}/payments` + pageQuery(opts),
-    { token },
+    { token, signal: opts?.signal },
   );
 }
 

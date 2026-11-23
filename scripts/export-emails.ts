@@ -8,7 +8,6 @@ import { renderWithdrawalFailedEmail } from "../src/emails/withdrawalFailedEmail
 
 const OUT_DIR = join(process.cwd(), "emails-export");
 
-const FAKE_NAME = "Ada Lovelace";
 const FAKE_EMAIL = "ada.lovelace@example.com";
 const FAKE_CODE = "123456";
 const FAKE_AMOUNT = "1.00000000";
@@ -22,7 +21,7 @@ const FAKE_REASON = "Insufficient balance to cover the withdrawal amount and fee
 const templates: Array<{ name: string; html: string }> = [
   {
     name: "welcome.html",
-    html: renderWelcomeEmail({ name: FAKE_NAME, email: FAKE_EMAIL }),
+    html: renderWelcomeEmail({ email: FAKE_EMAIL }),
   },
   {
     name: "otp-signup.html",
@@ -41,7 +40,6 @@ const templates: Array<{ name: string; html: string }> = [
   {
     name: "withdrawal-success.html",
     html: renderWithdrawalSuccessEmail({
-      name: FAKE_NAME,
       amount: FAKE_AMOUNT,
       asset: FAKE_ASSET,
       destination: FAKE_DESTINATION,
@@ -51,7 +49,6 @@ const templates: Array<{ name: string; html: string }> = [
   {
     name: "withdrawal-failed.html",
     html: renderWithdrawalFailedEmail({
-      name: FAKE_NAME,
       amount: FAKE_AMOUNT,
       asset: FAKE_ASSET,
       destination: FAKE_DESTINATION,

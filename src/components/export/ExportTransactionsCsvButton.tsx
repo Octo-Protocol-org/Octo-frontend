@@ -1,6 +1,6 @@
 "use client";
 
-import { ExportCsvButton } from "./ExportCsvButton";
+import { ExportCsvButton, type CsvExportContext } from "./ExportCsvButton";
 import { fetchAllPages, type CsvColumn } from "@/lib/csv";
 import { formatStroops } from "@/lib/amount";
 import {
@@ -35,11 +35,16 @@ export function ExportTransactionsCsvButton({
   walletId: string;
 }) {
   // Customer refs live on addresses; a failed lookup only blanks that column.
-  async function load(): Promise<Row[]> {
+  async function load({ signal, onProgress }: CsvExportContext): Promise<Row[]> {
     if (!token) throw new Error("Not signed in.");
     const [rows, addrs] = await Promise.all([
-      fetchAllPages((before) => listTransactionsPage(token, walletId, { before, limit: 200 })),
-      fetchAllPages((before) => listAddressesPage(token, walletId, { before, limit: 200 })),
+      fetchAllPages(
+        (before, sig) => listTransactionsPage(token, walletId, { before, limit: 200, signal: sig }),
+        { signal, onProgress },
+      ),
+      fetchAllPages((before, sig) =>
+        listAddressesPage(token, walletId, { before, limit: 200, signal: sig }),
+      ),
     ]);
     const refs = new Map<string, string>();
     for (const a of addrs) if (a.customer_ref) refs.set(a.id, a.customer_ref);
