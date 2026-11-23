@@ -37,7 +37,7 @@ export {
 } from "./client";
 export type { SubmitResult } from "./client";
 
-export { saveLocalBackup, loadLocalBackup, clearLocalBackups, versionOf } from "./store";
+export { saveLocalBackup, loadLocalBackup, clearLocalBackups, versionOf, markPhraseUnconfirmed, markPhraseConfirmed, isPhraseUnconfirmed, listUnconfirmedPhraseWalletIds } from "./store";
 
 export { unlockWallet, unlockBackup } from "./unlock";
 

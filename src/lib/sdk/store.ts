@@ -90,3 +90,46 @@ export function clearLocalBackups() {
     notifyStorageFailure();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phrase-confirmation tracking
+//
+// When a wallet is created, the user must confirm they saved the recovery
+// phrase. We record wallets that have not yet been confirmed in localStorage
+// so the UI can show a persistent warning until the user completes the step.
+// ---------------------------------------------------------------------------
+
+const PHRASE_UNCONFIRMED_PREFIX = "octo_phrase_unconfirmed_";
+
+/** Mark a wallet as having an unconfirmed recovery phrase. */
+export function markPhraseUnconfirmed(walletId: string): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(PHRASE_UNCONFIRMED_PREFIX + walletId, "1"); } catch { /* storage unavailable; best-effort */ }
+}
+
+/** Mark the recovery phrase as confirmed (clear the flag). */
+export function markPhraseConfirmed(walletId: string): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(PHRASE_UNCONFIRMED_PREFIX + walletId); } catch { /* ignore */ }
+}
+
+/** Returns true when the wallet's recovery phrase has not yet been confirmed in this browser. */
+export function isPhraseUnconfirmed(walletId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try { return localStorage.getItem(PHRASE_UNCONFIRMED_PREFIX + walletId) === "1"; } catch { return false; }
+}
+
+/** Returns the ids of all wallets whose phrase has not been confirmed in this browser. */
+export function listUnconfirmedPhraseWalletIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(PHRASE_UNCONFIRMED_PREFIX)) {
+        ids.push(key.slice(PHRASE_UNCONFIRMED_PREFIX.length));
+      }
+    }
+    return ids;
+  } catch { return []; }
+}

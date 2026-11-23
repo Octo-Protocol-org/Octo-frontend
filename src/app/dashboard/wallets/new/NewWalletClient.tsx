@@ -17,6 +17,8 @@ import {
   encryptSeed,
   serializeBackup,
   saveLocalBackup,
+  markPhraseUnconfirmed,
+  markPhraseConfirmed,
   type EncryptedBackup,
   type WalletKeys,
 } from "@/lib/sdk";
@@ -178,6 +180,8 @@ export function NewWalletClient() {
           "Your wallet was created, but this browser could not cache its encrypted backup. Keep your password and recovery phrase safe; Octo will provide the backup when you unlock this wallet.",
         );
       }
+      // Record that this wallet's recovery phrase has not been confirmed yet.
+      markPhraseUnconfirmed(wallet.id);
       pendingCreation.current = null;
       // The password is no longer needed; don't keep it in memory while the phrase is shown.
       setPassword("");
@@ -192,6 +196,7 @@ export function NewWalletClient() {
   }
 
   function onVerified() {
+    if (created) markPhraseConfirmed(created.wallet.id);
     setVerified(true);
     router.push("/dashboard");
   }

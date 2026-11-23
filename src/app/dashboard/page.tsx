@@ -16,6 +16,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Pagination } from "@/components/dashboard/Pagination";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { ErrorState } from "@/components/dashboard/WalletUI";
+import { isPhraseUnconfirmed } from "@/lib/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -207,9 +208,19 @@ function WalletCard({
   const short = `${wallet.address.slice(0, 6)}…${wallet.address.slice(-6)}`;
   const sponsorEnabled = sponsorship?.enabled === true;
   const dailyBudget = sponsorship?.daily_budget_stroops;
+  const phraseUnconfirmed = isPhraseUnconfirmed(wallet.id);
 
   return (
     <div className="rounded-2xl border border-border bg-burgundy-soft/30 p-5">
+      {phraseUnconfirmed && (
+        <p role="alert" className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+          ⚠ Recovery phrase not confirmed —{" "}
+          <a href={`/dashboard/wallets/${wallet.id}`} className="font-semibold underline">
+            confirm it now
+          </a>{" "}
+          to protect your funds.
+        </p>
+      )}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-burgundy/40 text-burgundy-bright">

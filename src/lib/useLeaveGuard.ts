@@ -15,9 +15,19 @@ export function useLeaveGuard(active: boolean) {
   const [pending, setPending] = useState<(() => void) | null>(null);
   // Set once the user confirms, so the leave action itself isn't intercepted again.
   const bypass = useRef(false);
+  // Set while we're doing our own programmatic history.back() to strip the sentinel.
+  const strippingSentinel = useRef(false);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      // Guard deactivated (e.g. phrase verified). Remove the sentinel entry if it's still
+      // current so the next Back press goes back one logical page, not two.
+      if (window.history.state?.[SENTINEL]) {
+        strippingSentinel.current = true;
+        window.history.back();
+      }
+      return;
+    }
     bypass.current = false;
 
     // Reload / tab close / external navigation: browsers only allow their own generic prompt.
@@ -38,11 +48,17 @@ export function useLeaveGuard(active: boolean) {
     }
     pushSentinel();
     function onPopState(e: PopStateEvent) {
+      // Ignore the pop we triggered ourselves to strip the sentinel on deactivation.
+      if (strippingSentinel.current) {
+        strippingSentinel.current = false;
+        return;
+      }
       if (bypass.current) return;
       // Capture phase runs before Next's router listener, so it never sees this pop.
       e.stopImmediatePropagation();
       pushSentinel();
-      setPending(() => () => window.history.go(-2));
+      // The sentinel was consumed by this pop, so confirming needs only go(-1).
+      setPending(() => () => window.history.go(-1));
     }
 
     window.addEventListener("beforeunload", onBeforeUnload);
