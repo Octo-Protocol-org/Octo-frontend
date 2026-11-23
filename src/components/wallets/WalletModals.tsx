@@ -178,6 +178,19 @@ export function TrustlineModal({
         </p>
       ) : (
         <form onSubmit={submit}>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          <input
+            type="text"
+            readOnly
+            aria-hidden="true"
+            tabIndex={-1}
+            autoComplete="username"
+            value={`wallet:${walletAddress}`}
+            className="sr-only"
+          />
           <div className="mt-4">
             <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
             <input
@@ -684,6 +697,21 @@ export function WithdrawModal({
           )}
         </div>
         <form onSubmit={(event) => { event.preventDefault(); void signAndRequestOtp(); }}>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          {walletAddress && (
+            <input
+              type="text"
+              readOnly
+              aria-hidden="true"
+              tabIndex={-1}
+              autoComplete="username"
+              value={`wallet:${walletAddress}`}
+              className="sr-only"
+            />
+          )}
           <div className="mt-4">
             <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
             <input
@@ -974,6 +1002,21 @@ export function WithdrawModal({
           </p>
         </div>
         <div>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          {walletAddress && (
+            <input
+              type="text"
+              readOnly
+              aria-hidden="true"
+              tabIndex={-1}
+              autoComplete="username"
+              value={`wallet:${walletAddress}`}
+              className="sr-only"
+            />
+          )}
           <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
           <input
             id={passwordId}

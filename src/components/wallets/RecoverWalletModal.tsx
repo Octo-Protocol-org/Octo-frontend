@@ -151,6 +151,19 @@ export function RecoverWalletModal({
           a transaction on this device.
         </p>
         <form onSubmit={handlePasswordSubmit} className="mt-5 space-y-4">
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          <input
+            type="text"
+            readOnly
+            aria-hidden="true"
+            tabIndex={-1}
+            autoComplete="username"
+            value={`wallet:${walletAddress}`}
+            className="sr-only"
+          />
           <div>
             <label htmlFor={newPasswordId} className="text-xs text-muted">New wallet password</label>
             <input
