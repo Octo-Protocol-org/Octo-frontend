@@ -21,6 +21,42 @@ describe("apiFetch", () => {
     vi.unstubAllGlobals();
   });
 
+  it("works when AbortSignal.any and AbortSignal.timeout are unavailable", async () => {
+    const anyFn = AbortSignal.any;
+    const timeoutFn = AbortSignal.timeout;
+    // Older browsers (Safari 16, Chrome 110) lack both static helpers.
+    Object.defineProperty(AbortSignal, "any", { value: undefined, configurable: true });
+    Object.defineProperty(AbortSignal, "timeout", { value: undefined, configurable: true });
+    try {
+      vi.mocked(fetch).mockResolvedValue(
+        makeResponse(200, { statusCode: 200, message: "ok", data: { id: "abc" } }),
+      );
+      const caller = new AbortController();
+      const result = await apiFetch<{ id: string }>("/test", { signal: caller.signal });
+      expect(result).toEqual({ id: "abc" });
+      const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+      expect(init.signal).toBeDefined();
+      expect(init.signal).not.toBe(caller.signal);
+
+      // A caller abort still propagates through the fallback combined signal.
+      vi.mocked(fetch).mockImplementation(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            const signal = init?.signal as AbortSignal;
+            signal.addEventListener("abort", () => reject(signal.reason));
+          }),
+      );
+      const pending = apiFetch("/test", { signal: caller.signal }).catch((e) => e);
+      caller.abort();
+      const err = await pending;
+      expect(err).toBeInstanceOf(DOMException);
+      expect((err as DOMException).name).toBe("AbortError");
+    } finally {
+      Object.defineProperty(AbortSignal, "any", { value: anyFn, configurable: true });
+      Object.defineProperty(AbortSignal, "timeout", { value: timeoutFn, configurable: true });
+    }
+  });
+
   it("resolves with data on a standard 200 envelope", async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeResponse(200, { statusCode: 200, message: "ok", data: { id: "abc" } }),
