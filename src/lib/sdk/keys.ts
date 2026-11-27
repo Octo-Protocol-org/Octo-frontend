@@ -94,6 +94,11 @@ function deriveSlip10(seed: Uint8Array, path: string): Uint8Array {
   return node.key;
 }
 
+/** Derive a Keypair at a hardened SLIP-0010 ed25519 path from a BIP-39 seed. Throws on an invalid path. */
+export function derivePath(seed: Uint8Array, path: string): Keypair {
+  return Keypair.fromRawEd25519Seed(Buffer.from(deriveSlip10(seed, path)));
+}
+
 /** Stellar's SEP-0005 path for the primary account (index 0). */
 const STELLAR_ACCOUNT_0 = "m/44'/148'/0'";
 

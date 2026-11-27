@@ -247,25 +247,26 @@ describe("SLIP-0010 ed25519 derivation vectors", () => {
   // Seed 000102030405060708090a0b0c0d0e0f from the SLIP-0010 spec.
   const SEED = Uint8Array.from(Array.from({ length: 16 }, (_, i) => i));
 
+  // [path, chain code, raw public key] from SLIP-0010 test vector 1 (public key without the 0x00 prefix).
   it.each([
     [
       "m/0'",
-      "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793",
-      "3c24da049451555d51a7014a37337aa4e12d41e485abccfa46b47dfb2af54b7a",
+      "8b59aa11380b624e81507a27fedda59fea6d0b779a778918a2fd3590e16e9c69",
+      "8c8a13df77a28f3445213a0f432fde644acaa215fc72dcdf300d5efaa85d350c",
     ],
     [
       "m/0'/1'",
-      "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793",
-      "3c24da049451555d51a7014a37337aa4e12d41e485abccfa46b47dfb2af54b7a",
+      "a320425f77d1b5c2505a6b1b27382b37368ee640e3557c315416801243552f14",
+      "1932a5270f335bed617d5b935c80aedb1a35bd9fc1e31acafd5372c30f5c1187",
     ],
     [
       "m/0'/1'/2'/2'/1000000000'",
-      "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793",
+      "68789923a0cac2cd5a29172a475fe9e0fb14cd6adb5ad98a3fa70333e7afa230",
       "3c24da049451555d51a7014a37337aa4e12d41e485abccfa46b47dfb2af54b7a",
     ],
   ])("derives the spec key for %s", (path, _chainCode, publicKey) => {
     const kp = derivePath(SEED, path);
-    expect(kp.publicKey()).toBe(publicKey);
+    expect(Buffer.from(kp.rawPublicKey()).toString("hex")).toBe(publicKey);
   });
 });
 
