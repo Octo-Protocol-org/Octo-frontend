@@ -7,7 +7,7 @@ import { clearLocalBackups } from "./sdk/store";
 
 const TOKEN_KEY = "octo_token";
 
-export type User = { id: string; email: string; username: string | null };
+export type User = { id: string; email: string; username: string | null; two_factor_enabled?: boolean };
 export type AuthResult = { token: string; user: User };
 /** Returned by signup/login when the account still needs OTP verification. */
 export type VerificationRequired = { user_id: string; email_verification_required: true };
@@ -46,13 +46,14 @@ export async function login(
   });
 }
 
-/** Complete a 2FA login challenge: the challenge id is sent as the bearer token. */
-export async function verify2fa(challengeId: string, code: string): Promise<AuthResult> {
-  return apiFetch<AuthResult>("/auth/2fa/challenge", {
+/** Complete a 2FA login challenge: the challenge id is sent as the bearer token. Returns the session token. */
+export async function verify2fa(challengeId: string, code: string): Promise<string> {
+  const result = await apiFetch<{ token: string }>("/v1/auth/2fa/challenge", {
     method: "POST",
     token: challengeId,
     body: JSON.stringify({ code }),
   });
+  return result.token;
 }
 
 export async function verifyEmail(userId: string, code: string): Promise<AuthResult> {
@@ -75,7 +76,7 @@ export async function me(token: string): Promise<User> {
 
 /**
  * Revoke the current session on the server so the bearer token stops working immediately.
- * Fire-and-forget friendly: never throws, and accepts `keepalive` so the request can outlive
+ * Fire-and-forget friendly: never throws. keepalive defaults to true so the request survives
  * a page unload/redirect. Callers should not await this before clearing local state.
  */
 export async function logoutCurrentSession(
@@ -86,7 +87,7 @@ export async function logoutCurrentSession(
     await apiFetch<void>("/v1/sessions/current", {
       method: "DELETE",
       token,
-      keepalive: opts.keepalive,
+      keepalive: opts.keepalive ?? true,
     });
   } catch {
     // Best-effort: sign-out must still complete locally if the server call fails.
@@ -148,7 +149,7 @@ export function clearToken() {
  * Always call this instead of clearToken() directly.
  *
  * This only clears local state; callers that want the server-side session revoked should
- * fire logoutCurrentSession(token, { keepalive: true }) before calling this.
+ * fire logoutCurrentSession(token) before calling this.
  */
 export function signOut() {
   if (typeof window === "undefined") return;

@@ -127,8 +127,8 @@ export function AuthForm({
     }
     setLoading(true);
     try {
-      const result = await verify2fa(challengeId, trimmed);
-      finish(result.token);
+      const token = await verify2fa(challengeId, trimmed);
+      finish(token);
     } catch (err) {
       const message = errorMessage(err, "Invalid or expired code.");
       setError(message);
