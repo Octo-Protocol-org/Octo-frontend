@@ -53,6 +53,34 @@ export function path(
   );
 }
 
+/** Combine signals without relying on AbortSignal.any, which older browsers lack. */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === "function") return AbortSignal.any(signals);
+  const controller = new AbortController();
+  const forward = (source: AbortSignal) => {
+    if (source.aborted) {
+      controller.abort(source.reason);
+      return;
+    }
+    const onAbort = () => {
+      source.removeEventListener("abort", onAbort);
+      controller.abort(source.reason);
+    };
+    source.addEventListener("abort", onAbort, { once: true });
+  };
+  signals.forEach(forward);
+  return controller.signal;
+}
+
+/** Build a timeout signal with the same TimeoutError reason as AbortSignal.timeout. */
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("signal timed out", "TimeoutError")), ms);
+  controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  return controller.signal;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & {
@@ -79,16 +107,16 @@ export async function apiFetch<T>(
   } = options;
 
   // Combine caller signal with a hard timeout so hung connections don't spin forever.
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  const signal = callerSignal
-    ? AbortSignal.any([callerSignal, timeoutSignal])
-    : timeoutSignal;
+  const timeout = timeoutSignal(timeoutMs);
+  const combined = callerSignal
+    ? anySignal([callerSignal, timeout])
+    : timeout;
 
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...rest,
-      signal,
+      signal: combined,
       headers: {
         ...(rest.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),

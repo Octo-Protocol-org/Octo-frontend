@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { CopyButton } from "@/components/CopyButton";
 
 export default function DashboardError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const digest = error.digest;
   useEffect(() => {
-    // Keep diagnostics in the client logs without exposing error details in the UI.
-    console.error("Dashboard render error", { digest: "redacted" });
-  }, []);
+    // The digest is an opaque hash for correlating with server logs; it holds no message or stack.
+    console.error("Dashboard render error", { digest: error.digest });
+  }, [error.digest]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-center">
@@ -22,6 +25,13 @@ export default function DashboardError({
         <p className="mt-3 text-sm leading-6 text-muted">
           We could not load this wallet view. No wallet keys or sensitive details are shown here.
         </p>
+        {digest && (
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs text-muted">
+            <span>Reference:</span>
+            <code className="break-all font-mono text-foreground">{digest}</code>
+            <CopyButton value={digest} label="Copy reference" />
+          </div>
+        )}
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <button
             type="button"

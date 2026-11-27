@@ -2,12 +2,13 @@
 
 import { formatCountdownSeconds } from "@/lib/format";
 import { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { Modal, CopyField, HighlightedAddress } from "@/components/dashboard/Modal";
 import { DepositQrCodes } from "@/components/qr/DepositQrCodes";
 import { errorMessage, errorText } from "@/lib/api";
-import { usdcForNetwork, type Address, type Balance } from "@/lib/wallets";
+import { usdcForNetwork, getWhitelistConfig, listWhitelistedAddresses, type Address, type Balance, type WhitelistedAddress } from "@/lib/wallets";
 import { explorerAccountUrl, explorerTxUrl, network } from "@/lib/network";
 import { Transaction, TransactionBuilder, FeeBumpTransaction } from "@stellar/stellar-base";
 import {
@@ -178,6 +179,19 @@ export function TrustlineModal({
         </p>
       ) : (
         <form onSubmit={submit}>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          <input
+            type="text"
+            readOnly
+            aria-hidden="true"
+            tabIndex={-1}
+            autoComplete="username"
+            value={`wallet:${walletAddress}`}
+            className="sr-only"
+          />
           <div className="mt-4">
             <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
             <input
@@ -338,6 +352,7 @@ export function WithdrawModal({
   const [code, setCode] = useState("");
   // Reserve/fee params for the spendable-XLM calculation; null until loaded (defaults apply).
   const [reserveInfo, setReserveInfo] = useState<SigningInfo | null>(null);
+  const [reserveInfoLoading, setReserveInfoLoading] = useState(true);
   // Whether the signed tx creates the destination account (unfunded XLM destination).
   const [createsAccount, setCreatesAccount] = useState(false);
   // Countdown state for the signed envelope's time window.
@@ -364,8 +379,59 @@ export function WithdrawModal({
     assets.find((a) => a.key === selectedKey) ?? assets[0] ?? defaultAsset;
 
   useEffect(() => {
-    getSigningInfo(token, walletId).then(setReserveInfo).catch(() => {});
+    setReserveInfoLoading(true);
+    getSigningInfo(token, walletId)
+      .then(setReserveInfo)
+      .catch(() => {})
+      .finally(() => setReserveInfoLoading(false));
   }, [token, walletId]);
+
+  // Withdrawal allowlist (UX-only gate; the server remains the authority). `allowlistEnabled` is
+  // only meaningful once `allowlistState === "ready"`; on error we fail open and let the server enforce.
+  const [allowlistEnabled, setAllowlistEnabled] = useState(false);
+  const [allowlistEntries, setAllowlistEntries] = useState<WhitelistedAddress[]>([]);
+  const [allowlistState, setAllowlistState] = useState<"loading" | "ready" | "error">("loading");
+  const [allowlistBlocked, setAllowlistBlocked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const cfg = await getWhitelistConfig(token, walletId);
+        if (!active) return;
+        setAllowlistEnabled(cfg.enabled);
+        if (!cfg.enabled) {
+          setAllowlistEntries([]);
+          setAllowlistState("ready");
+          return;
+        }
+        try {
+          const entries = await listWhitelistedAddresses(token, walletId);
+          if (!active) return;
+          setAllowlistEntries(entries);
+          setAllowlistState("ready");
+        } catch {
+          // List failed: don't guess — fail open; submit-signed still enforces server-side.
+          if (!active) return;
+          setAllowlistEntries([]);
+          setAllowlistState("error");
+        }
+      } catch {
+        // Config failed: fail open rather than risk blocking a valid withdrawal.
+        if (!active) return;
+        setAllowlistEnabled(false);
+        setAllowlistEntries([]);
+        setAllowlistState("error");
+      }
+    })();
+    return () => { active = false; };
+  }, [token, walletId]);
+
+  // Label the allowlist gives the entered destination, when enforcement is on and it's listed.
+  const destinationAllowlistLabel =
+    allowlistEnabled && allowlistState === "ready"
+      ? allowlistEntries.find((e) => baseAccountOf(e.address) === baseAccountOf(destination))?.label ?? null
+      : null;
 
   // Tick once a second while a signed transaction is waiting for its code.
   useEffect(() => {
@@ -425,9 +491,24 @@ export function WithdrawModal({
 
   async function proceedToReview() {
     setError(null);
+    setAllowlistBlocked(false);
     const checked = validate();
     if ("error" in checked) {
       setError(checked.error);
+      return;
+    }
+    // Enforced-allowlist gate (UX only; the server remains the authority): catch a non-allowlisted
+    // destination before the password/sign step so the user doesn't sign and wait for an OTP only
+    // to be rejected by submit-signed. While the allowlist is still loading, hold the user back so
+    // a slow config fetch can't let an unlisted destination slip through.
+    if (allowlistEnabled && allowlistState === "ready") {
+      const base = baseAccountOf(destination);
+      if (!allowlistEntries.some((e) => baseAccountOf(e.address) === base)) {
+        setAllowlistBlocked(true);
+        return;
+      }
+    } else if (allowlistState === "loading") {
+      setError("Checking the withdrawal allowlist — try again in a moment.");
       return;
     }
     setSubmitting(true);
@@ -653,6 +734,11 @@ export function WithdrawModal({
             <span className="text-muted">Destination:</span>
             <HighlightedAddress address={destination} />
           </div>
+          {destinationAllowlistLabel && (
+            <p className="text-muted">
+              Allowlist: <span className="text-foreground">{destinationAllowlistLabel}</span>
+            </p>
+          )}
           <p className="text-muted">
             Asset: <span className="text-foreground">{selected.code}</span>
             {selected.asset && <span className="ml-1 break-all font-mono text-foreground">({selected.asset.issuer})</span>}
@@ -684,6 +770,21 @@ export function WithdrawModal({
           )}
         </div>
         <form onSubmit={(event) => { event.preventDefault(); void signAndRequestOtp(); }}>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          {walletAddress && (
+            <input
+              type="text"
+              readOnly
+              aria-hidden="true"
+              tabIndex={-1}
+              autoComplete="username"
+              value={`wallet:${walletAddress}`}
+              className="sr-only"
+            />
+          )}
           <div className="mt-4">
             <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
             <input
@@ -783,7 +884,7 @@ export function WithdrawModal({
         </p>
 
         <div className="mt-4">
-          <OtpInput value={code} onChange={setCode} disabled={submitting} />
+          <OtpInput value={code} onChange={setCode} disabled={submitting} label="Withdrawal confirmation code" />
         </div>
 
         {expired && (
@@ -906,7 +1007,7 @@ export function WithdrawModal({
           <input
             id={destinationId}
             value={destination}
-            onChange={(e) => setDestination(e.target.value.trim())}
+            onChange={(e) => { setDestination(e.target.value.trim()); setAllowlistBlocked(false); }}
             placeholder="G… or M…"
             className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
@@ -917,10 +1018,10 @@ export function WithdrawModal({
             <button
               type="button"
               onClick={() => setAmount(formatStroops(spendableStroops))}
-              disabled={spendableStroops <= BigInt(0)}
+              disabled={reserveInfoLoading || spendableStroops <= BigInt(0)}
               className="text-xs text-burgundy-bright hover:underline disabled:opacity-50"
             >
-              Max
+              {reserveInfoLoading ? "Loading…" : "Max"}
             </button>
           </div>
           <input
@@ -931,6 +1032,19 @@ export function WithdrawModal({
             placeholder="0.0000000"
             className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
+          {/* Show spendable vs reserved breakdown for XLM so the user can verify Max is correct. */}
+          {!selected.asset && !reserveInfoLoading && reserveStroops !== null && (
+            <p className="mt-1 text-[11px] text-muted">
+              Available:{" "}
+              <span className="text-foreground">{formatStroops(spendableStroops)} XLM</span>
+              {" · "}
+              {reserveIsExact(reserveInfo) ? "" : "~"}
+              <span className="text-foreground">{formatStroops(reserveStroops)} XLM</span> reserved
+              {!reserveIsExact(reserveInfo) && (
+                <span> (estimated — exact value depends on network state)</span>
+              )}
+            </p>
+          )}
         </div>
         <div>
           <div className="flex items-center justify-between">
@@ -974,6 +1088,21 @@ export function WithdrawModal({
           </p>
         </div>
         <div>
+          {/*
+            Hidden username scoped to this wallet so password managers store wallet passwords
+            separately from the account login credential (issue #683).
+          */}
+          {walletAddress && (
+            <input
+              type="text"
+              readOnly
+              aria-hidden="true"
+              tabIndex={-1}
+              autoComplete="username"
+              value={`wallet:${walletAddress}`}
+              className="sr-only"
+            />
+          )}
           <label htmlFor={passwordId} className="text-xs text-muted">Wallet password (to sign)</label>
           <input
             id={passwordId}
@@ -991,6 +1120,15 @@ export function WithdrawModal({
             have {Math.round(TX_TIMEOUT_SECONDS / 60)} minutes to enter the emailed code.
           </p>
         </div>
+
+        {allowlistBlocked && (
+          <div role="alert" className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">
+            <p>This address isn&apos;t on your withdrawal allowlist.</p>
+            <Link href={`/dashboard/wallets/${walletId}/whitelist`} className="mt-1 inline-block font-semibold underline">
+              Manage your allowlist
+            </Link>
+          </div>
+        )}
 
         {error && (
           <p id={errorId} role="alert" className="rounded-lg border border-burgundy/40 bg-burgundy/10 px-3 py-2 text-sm text-burgundy-bright">

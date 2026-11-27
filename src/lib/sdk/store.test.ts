@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearLocalBackups, loadLocalBackup, saveLocalBackup, versionOf } from "./store";
+import { clearLocalBackups, loadLocalBackup, saveLocalBackup, versionOf, markPhraseUnconfirmed, markPhraseConfirmed, isPhraseUnconfirmed, listUnconfirmedPhraseWalletIds } from "./store";
 
 const backup = {
   v: 1 as const,
@@ -40,5 +40,39 @@ describe("versionOf", () => {
     expect(versionOf({ backup_version: "v2", encrypted_backup: "blob" })).toBe("v2");
     expect(versionOf({ backup_version: null, encrypted_backup: "blob" })).toBe("blob");
     expect(versionOf({})).toBe("");
+  });
+});
+
+describe("phrase confirmation tracking", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("marks, confirms, and lists unconfirmed wallets", () => {
+    const storage = (() => {
+      const items = new Map<string, string>();
+      return {
+        getItem: (k: string) => items.get(k) ?? null,
+        setItem: (k: string, v: string) => { items.set(k, v); },
+        removeItem: (k: string) => { items.delete(k); },
+        get length() { return items.size; },
+        key: (i: number) => [...items.keys()][i] ?? null,
+      };
+    })();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("window", { localStorage: storage });
+
+    expect(isPhraseUnconfirmed("wallet-a")).toBe(false);
+
+    markPhraseUnconfirmed("wallet-a");
+    markPhraseUnconfirmed("wallet-b");
+    expect(isPhraseUnconfirmed("wallet-a")).toBe(true);
+    expect(listUnconfirmedPhraseWalletIds()).toContain("wallet-a");
+    expect(listUnconfirmedPhraseWalletIds()).toContain("wallet-b");
+
+    markPhraseConfirmed("wallet-a");
+    expect(isPhraseUnconfirmed("wallet-a")).toBe(false);
+    expect(listUnconfirmedPhraseWalletIds()).not.toContain("wallet-a");
+    expect(listUnconfirmedPhraseWalletIds()).toContain("wallet-b");
   });
 });

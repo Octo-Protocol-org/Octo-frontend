@@ -19,6 +19,7 @@ import {
   type Transaction,
 } from "@/lib/wallets";
 import { getSigningInfo, type SigningInfo } from "@/lib/sdk";
+import { isPhraseUnconfirmed } from "@/lib/sdk";
 import { network } from "@/lib/network";
 import { explorerTxUrl } from "@/lib/network";
 import { parseAmount, formatStroops } from "@/lib/amount";
@@ -189,6 +190,13 @@ export default function WalletOverview({
                   ]).finally(() => setStatsLoading(false));
                 }
               }} />
+            )}
+            {/* Persistent warning for wallets whose recovery phrase was not confirmed */}
+            {isPhraseUnconfirmed(id) && (
+              <p role="alert" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+                ⚠ You haven&apos;t confirmed your recovery phrase for this wallet. If you forget your encryption password without it, the funds will be unrecoverable.{" "}
+                <a href="/dashboard/wallets/new" className="font-semibold underline">Learn more</a>
+              </p>
             )}
             {/* header */}
             <div>              <h1 className="text-2xl font-semibold text-foreground">
@@ -481,6 +489,7 @@ export default function WalletOverview({
           token={token}
           walletId={id}
           walletAddress={wallet?.address}
+          walletLabel={wallet?.label}
           onClose={() => setShowChangePassword(false)}
           onDone={() => setShowChangePassword(false)}
         />

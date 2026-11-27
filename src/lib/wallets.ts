@@ -150,7 +150,7 @@ export function listWalletsPage(
   token: string,
   opts?: PageOpts,
 ): Promise<Paginated<WalletView>> {
-  return apiFetch<Paginated<WalletView>>("/v1/wallets" + pageQuery(opts), { token });
+  return apiFetch<Paginated<WalletView>>("/v1/wallets" + pageQuery(opts), { token, signal: opts?.signal });
 }
 
 /** Fetch every wallet by walking all cursor pages. */
@@ -221,7 +221,7 @@ export function listTransactionsPage(
 ): Promise<Paginated<Transaction>> {
   return apiFetch<Paginated<Transaction>>(
     path`/v1/wallets/${id}/transactions` + pageQuery(opts),
-    { token },
+    { token, signal: opts?.signal },
   );
 }
 
@@ -233,7 +233,7 @@ export function listAddressesPage(
 ): Promise<Paginated<Address>> {
   return apiFetch<Paginated<Address>>(
     path`/v1/wallets/${id}/addresses` + pageQuery(opts),
-    { token },
+    { token, signal: opts?.signal },
   );
 }
 

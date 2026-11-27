@@ -17,6 +17,8 @@ import {
   encryptSeed,
   serializeBackup,
   saveLocalBackup,
+  markPhraseUnconfirmed,
+  markPhraseConfirmed,
   type EncryptedBackup,
   type WalletKeys,
 } from "@/lib/sdk";
@@ -48,11 +50,13 @@ type PendingCreation = {
 export function NewWalletClient() {
   const { user, token, loading, logout } = useAuth();
   const router = useRouter();
+  const confirmMismatchId = useId();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [strength, setStrength] = useState<PasswordAssessment | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +182,8 @@ export function NewWalletClient() {
           "Your wallet was created, but this browser could not cache its encrypted backup. Keep your password and recovery phrase safe; Octo will provide the backup when you unlock this wallet.",
         );
       }
+      // Record that this wallet's recovery phrase has not been confirmed yet.
+      markPhraseUnconfirmed(wallet.id);
       pendingCreation.current = null;
       // The password is no longer needed; don't keep it in memory while the phrase is shown.
       setPassword("");
@@ -192,6 +198,7 @@ export function NewWalletClient() {
   }
 
   function onVerified() {
+    if (created) markPhraseConfirmed(created.wallet.id);
     setVerified(true);
     router.push("/dashboard");
   }
@@ -321,6 +328,19 @@ export function NewWalletClient() {
                     lose both this password and your recovery phrase, your funds are
                     unrecoverable. A passphrase of several unrelated words works well.
                   </p>
+                  {/*
+                    Hidden username tells password managers this credential is a wallet-
+                    specific password, not the account login (issue #683).
+                  */}
+                  <input
+                    type="text"
+                    readOnly
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    autoComplete="username"
+                    value="wallet:new"
+                    className="sr-only"
+                  />
                   <input
                     id="wallet-password"
                     type="password"
@@ -336,15 +356,42 @@ export function NewWalletClient() {
                     id="wallet-password-strength"
                     assessment={password ? strength : null}
                   />
+                  {/* Confirm password with visible label (issue #705) */}
+                  <label
+                    htmlFor="wallet-password-confirm"
+                    className="mt-4 block text-sm font-medium text-foreground"
+                  >
+                    Confirm encryption password
+                  </label>
                   <input
+                    id="wallet-password-confirm"
                     type="password"
                     value={confirmPassword}
-                    onChange={editField(setConfirmPassword)}
-                    placeholder="Confirm password"
-                    aria-label="Confirm encryption password"
+                    onChange={(e) => {
+                      editField(setConfirmPassword)(e);
+                      setConfirmTouched(true);
+                    }}
+                    placeholder="Re-enter your password"
                     autoComplete="new-password"
-                    className="mt-2 w-full rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:border-burgundy-bright focus:outline-none"
+                    aria-invalid={confirmTouched && confirmPassword !== password}
+                    aria-describedby={confirmTouched && confirmPassword !== password ? confirmMismatchId : undefined}
+                    className={`mt-2 w-full rounded-xl border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted/60 focus:outline-none ${
+                      confirmTouched && confirmPassword !== password
+                        ? "border-danger focus:border-danger"
+                        : "border-border focus:border-burgundy-bright"
+                    }`}
                   />
+                  {/* Inline mismatch shown as soon as confirm is non-empty and differs. */}
+                  {confirmTouched && confirmPassword !== password && (
+                    <p
+                      id={confirmMismatchId}
+                      role="status"
+                      aria-live="polite"
+                      className="mt-1 text-xs text-danger"
+                    >
+                      Passwords do not match.
+                    </p>
+                  )}
                 </div>
 
                 {error && (
@@ -406,6 +453,17 @@ function RecoveryReveal({
   const [acked, setAcked] = useState(false);
   // Chosen once, so going back to re-read the phrase doesn't change which words are asked.
   const [indices] = useState(() => pickWordIndices(words.length, VERIFY_WORD_COUNT));
+  // Phrase is hidden until the user deliberately reveals it (issue #704).
+  const [phraseVisible, setPhraseVisible] = useState(false);
+
+  // Re-blur when the tab loses visibility (screen-share / idle protection).
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "hidden") setPhraseVisible(false);
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   if (step === "verify") {
     return (
@@ -430,17 +488,49 @@ function RecoveryReveal({
         next.
       </p>
 
-      <ol className="mt-5 grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface-sunken p-4">
-        {words.map((word, i) => (
-          <li
-            key={i}
-            className="rounded-md bg-hover px-2 py-1.5 text-center text-sm text-foreground"
+      {/* Phrase grid — blurred until revealed; words removed from a11y tree while hidden. */}
+      <div className="relative mt-5">
+        <ol
+          aria-hidden={!phraseVisible}
+          className={`grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface-sunken p-4 transition-[filter] duration-200 ${
+            phraseVisible ? "" : "select-none blur-md"
+          }`}
+        >
+          {words.map((word, i) => (
+            <li
+              key={i}
+              className="rounded-md bg-hover px-2 py-1.5 text-center text-sm text-foreground"
+            >
+              <span className="mr-1 text-muted">{i + 1}.</span>
+              {word}
+            </li>
+          ))}
+        </ol>
+
+        {/* Overlay shown while phrase is hidden */}
+        {!phraseVisible && (
+          <button
+            type="button"
+            onClick={() => setPhraseVisible(true)}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-surface-sunken/60 text-sm font-medium text-foreground backdrop-blur-sm"
           >
-            <span className="mr-1 text-muted">{i + 1}.</span>
-            {word}
-          </li>
-        ))}
-      </ol>
+            <span aria-hidden="true" className="text-2xl">🔒</span>
+            <span>Click to reveal</span>
+            <span className="text-xs font-normal text-muted">Make sure no one can see your screen</span>
+          </button>
+        )}
+      </div>
+
+      {/* "Hide again" once revealed */}
+      {phraseVisible && (
+        <button
+          type="button"
+          onClick={() => setPhraseVisible(false)}
+          className="mt-2 text-xs text-muted hover:text-foreground"
+        >
+          Hide again
+        </button>
+      )}
 
       <div className="mt-5 rounded-lg bg-surface-sunken p-3 text-xs">
         <p className="text-muted">Address</p>

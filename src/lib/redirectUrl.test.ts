@@ -4,6 +4,8 @@ import { validateRedirectUrl } from "./redirectUrl";
 describe("validateRedirectUrl", () => {
   const accept = [
     "https://shop.example/",
+    "https://shop.example/thanks",
+    "https://a.b.c/x?y=1#z",
     "https://shop.example/thanks?x=1#a",
     "https://shop.example:8443/path",
     "https://sub.shop.example./",
@@ -11,16 +13,20 @@ describe("validateRedirectUrl", () => {
   const reject = [
     "https://localhost./",
     "https://localhost/",
+    "https://foo.localhost/",
     "https://app.localhost./",
     "https://user:pass@shop.example/",
     "https://octo.dev@evil.example/",
     "https://[::1]/",
     "https://[2001:db8::1]/",
     "https://127.0.0.1/",
+    "https://10.0.0.1/",
     "javascript:alert(1)",
     "data:text/html,hi",
     "http://shop.example/",
     "https://intranet/",
+    "https://[/bad-url",
+    "not a url",
     `https://shop.example/${"a".repeat(2048)}`,
     "",
   ];
