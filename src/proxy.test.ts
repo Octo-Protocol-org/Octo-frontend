@@ -9,8 +9,9 @@ function makeRequest(url = 'https://octo.example.com/', headers: Record<string, 
   return new NextRequest(url, { headers });
 }
 
+// The proxy passes the nonce to Next as a request header; NextResponse.next() exposes request overrides under this prefix.
 function getNonceHeader(res: Response): string | null {
-  return res.headers.get('x-nonce');
+  return res.headers.get('x-middleware-request-x-nonce');
 }
 
 function getCsp(res: Response): string {
@@ -140,6 +141,7 @@ describe('proxy HSTS policy per environment', () => {
 
   it('applies a strict HSTS policy in production', async () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
 
     const res = await proxy(makeRequest());
     const hsts = res.headers.get('strict-transport-security');
@@ -210,15 +212,17 @@ describe('proxy inline theme script allowance', () => {
     process.env = { ...ORIGINAL_ENV };
   });
 
-  it('allows the inline theme script via a hash and not a nonce on strict routes', async () => {
+  it('allows the inline theme script via a hash alongside the nonce on strict routes', async () => {
     const res = await proxy(makeRequest('https://octo.example.com/dashboard'));
     const csp = getCsp(res);
 
     const scriptSrc = getDirective(csp, 'script-src');
     expect(scriptSrc).not.toBeNull();
 
+    // The theme script runs before hydration so it can't carry the nonce; its hash allows it instead.
     expect(scriptSrc).toContain("'sha256-");
-    expect(scriptSrc).not.toContain("'nonce-");
+    expect(scriptSrc).toContain("'nonce-");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
   it('keeps unsafe-inline without the hash on static routes', async () => {
@@ -492,7 +496,7 @@ describe('proxy CSP connect-src hosts', () => {
   });
 
   it('includes the configured API origin in connect-src', async () => {
-    process.env.NEXT_PUBLIC_API_URL = 'https://api.octo.example.com';
+    process.env.NEXT_PUBLIC_OCTO_API_URL = 'https://api.octo.example.com';
 
     const res = await proxy(makeRequest('https://octo.example.com/'));
     const connectSrc = getDirective(getCsp(res), 'connect-src');

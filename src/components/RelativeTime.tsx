@@ -1,6 +1,55 @@
 "use client";
 
-// Shows relative time (e.g., "2 hours ago") with full datetime on hover.
+import { useSyncExternalStore } from "react";
+
+// One shared ticker for every RelativeTime on the page, so labels stay current without an interval per row.
+const TICK_MS = 30_000;
+const listeners = new Set<() => void>();
+let tickNow = Date.now();
+let timer: ReturnType<typeof setInterval> | null = null;
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  if (timer === null) {
+    tickNow = Date.now();
+    timer = setInterval(() => {
+      tickNow = Date.now();
+      listeners.forEach((l) => l());
+    }, TICK_MS);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0 && timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+}
+
+const getNow = () => tickNow;
+
+// Largest unit first; each entry is the unit and its length in seconds.
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 365 * 24 * 60 * 60],
+  ["month", 30 * 24 * 60 * 60],
+  ["week", 7 * 24 * 60 * 60],
+  ["day", 24 * 60 * 60],
+  ["hour", 60 * 60],
+  ["minute", 60],
+  ["second", 1],
+];
+
+const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+/** Localized relative label ("5 minutes ago", "in 1 hour") for `date` measured from `now`. */
+export function formatRelativeTime(date: Date, now: number = Date.now()): string {
+  const diffSec = Math.round((date.getTime() - now) / 1000);
+  const abs = Math.abs(diffSec);
+  const [unit, size] = UNITS.find(([, s]) => abs >= s) ?? ["second", 1];
+  return formatter.format(Math.trunc(diffSec / size), unit);
+}
+
+// Shows relative time (e.g., "2 hours ago") with full datetime on hover; invalid dates render a placeholder.
 export function RelativeTime({
   date,
   className = "",
@@ -8,8 +57,10 @@ export function RelativeTime({
   date: string | Date;
   className?: string;
 }) {
+  const now = useSyncExternalStore(subscribe, getNow, getNow);
   const d = typeof date === "string" ? new Date(date) : date;
-  const relative = formatRelativeTime(d);
+  if (Number.isNaN(d.getTime())) return <span className={className}>—</span>;
+
   const full = d.toLocaleString(undefined, {
     year: "numeric",
     month: "short",
@@ -21,33 +72,8 @@ export function RelativeTime({
   });
 
   return (
-    <time dateTime={d.toISOString()} title={full} className={className}>
-      {relative}
+    <time dateTime={d.toISOString()} title={full} className={className} suppressHydrationWarning>
+      {formatRelativeTime(d, now)}
     </time>
   );
-}
-
-function formatRelativeTime(date: Date): string {
-  const now = Date.now();
-  const then = date.getTime();
-  const diffMs = now - then;
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  if (diffDay < 30) {
-    const weeks = Math.floor(diffDay / 7);
-    return `${weeks}w ago`;
-  }
-  if (diffDay < 365) {
-    const months = Math.floor(diffDay / 30);
-    return `${months}mo ago`;
-  }
-  const years = Math.floor(diffDay / 365);
-  return `${years}y ago`;
 }
