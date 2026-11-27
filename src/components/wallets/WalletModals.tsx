@@ -338,6 +338,7 @@ export function WithdrawModal({
   const [code, setCode] = useState("");
   // Reserve/fee params for the spendable-XLM calculation; null until loaded (defaults apply).
   const [reserveInfo, setReserveInfo] = useState<SigningInfo | null>(null);
+  const [reserveInfoLoading, setReserveInfoLoading] = useState(true);
   // Whether the signed tx creates the destination account (unfunded XLM destination).
   const [createsAccount, setCreatesAccount] = useState(false);
   // Countdown state for the signed envelope's time window.
@@ -364,7 +365,11 @@ export function WithdrawModal({
     assets.find((a) => a.key === selectedKey) ?? assets[0] ?? defaultAsset;
 
   useEffect(() => {
-    getSigningInfo(token, walletId).then(setReserveInfo).catch(() => {});
+    setReserveInfoLoading(true);
+    getSigningInfo(token, walletId)
+      .then(setReserveInfo)
+      .catch(() => {})
+      .finally(() => setReserveInfoLoading(false));
   }, [token, walletId]);
 
   // Tick once a second while a signed transaction is waiting for its code.
@@ -917,10 +922,10 @@ export function WithdrawModal({
             <button
               type="button"
               onClick={() => setAmount(formatStroops(spendableStroops))}
-              disabled={spendableStroops <= BigInt(0)}
+              disabled={reserveInfoLoading || spendableStroops <= BigInt(0)}
               className="text-xs text-burgundy-bright hover:underline disabled:opacity-50"
             >
-              Max
+              {reserveInfoLoading ? "Loading…" : "Max"}
             </button>
           </div>
           <input
@@ -931,6 +936,19 @@ export function WithdrawModal({
             placeholder="0.0000000"
             className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
+          {/* Show spendable vs reserved breakdown for XLM so the user can verify Max is correct. */}
+          {!selected.asset && !reserveInfoLoading && reserveStroops !== null && (
+            <p className="mt-1 text-[11px] text-muted">
+              Available:{" "}
+              <span className="text-foreground">{formatStroops(spendableStroops)} XLM</span>
+              {" · "}
+              {reserveIsExact(reserveInfo) ? "" : "~"}
+              <span className="text-foreground">{formatStroops(reserveStroops)} XLM</span> reserved
+              {!reserveIsExact(reserveInfo) && (
+                <span> (estimated — exact value depends on network state)</span>
+              )}
+            </p>
+          )}
         </div>
         <div>
           <div className="flex items-center justify-between">
