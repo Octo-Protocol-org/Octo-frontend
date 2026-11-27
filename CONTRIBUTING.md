@@ -91,6 +91,19 @@ Use one-line comments. Keep them short and explain *why*, not *what*:
 Avoid multi-line comment blocks and commented-out code. If code is no longer
 needed, delete it — version control remembers it.
 
+## Amount precision
+
+Stellar amounts are int64 stroops. The int64 max (9,223,372,036,854,775,807) is
+larger than `Number.MAX_SAFE_INTEGER` (2^53 − 1), so amounts **must never travel
+through a JS `number`** when they could be that large.
+
+Rules:
+- API types use `Stroops` (a branded `string`) from `src/lib/brands.ts`, not `number`.
+- Use `formatStroops` and `sumStroops` from `src/lib/amount.ts` for display and arithmetic.
+- The same rule applies to memo IDs (uint64) — use the `MemoId` branded type.
+- When adding a new API field that is a stroop amount or a memo ID, coordinate with the
+  backend to send it as a decimal string and use the branded types on the frontend.
+
 ## Pull requests
 
 - Keep changes focused; one logical change per pull request.

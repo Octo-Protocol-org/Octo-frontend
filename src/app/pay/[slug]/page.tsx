@@ -17,6 +17,7 @@ import {
   type PaymentIntent,
   type PaymentStatus,
 } from "@/lib/payment-links";
+import type { Stroops } from "@/lib/brands";
 import { usdcForNetwork } from "@/lib/network";
 import { network } from "@/lib/network";
 import { buildUnsignedPayment, assertNetworkConsistency } from "@/lib/sdk";
@@ -126,16 +127,21 @@ function shortenHash(hash: string) {
   return `${hash.slice(0, 8)}…${hash.slice(-8)}`;
 }
 
+// Reads an API stroop amount (decimal string or legacy number) as a safe integer; null if invalid or unsafe.
+function safeStroops(raw: Stroops | number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  const text = String(raw);
+  if (!/^\d+$/.test(text)) return null;
+  const value = Number(text);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
 // Resolves the min/max flexible bounds for a link, falling back to the client-side minimum.
 function flexibleBounds(link: PublicPaymentLink) {
-  const min =
-    typeof link.min_amount_usdc_stroops === "number" && link.min_amount_usdc_stroops > 0
-      ? link.min_amount_usdc_stroops
-      : MIN_FLEXIBLE_USD_STROOPS;
-  const max =
-    typeof link.max_amount_usdc_stroops === "number" && link.max_amount_usdc_stroops > 0
-      ? link.max_amount_usdc_stroops
-      : null;
+  const rawMin = safeStroops(link.min_amount_usdc_stroops);
+  const rawMax = safeStroops(link.max_amount_usdc_stroops);
+  const min = rawMin !== null && rawMin > 0 ? rawMin : MIN_FLEXIBLE_USD_STROOPS;
+  const max = rawMax !== null && rawMax > 0 ? rawMax : null;
   return { min, max };
 }
 
@@ -300,7 +306,7 @@ export default function PayPage({
     (paymentId: string, status: PaymentStatus): boolean => {
       if (intentRef.current?.intent.payment_id !== paymentId || confirmedRef.current) return true;
       if (status.status === "confirmed") {
-        markConfirmed(paymentId, status.transaction_id, intentRef.current?.intent.amount_usdc_stroops ?? null);
+        markConfirmed(paymentId, status.transaction_id, safeStroops(intentRef.current?.intent.amount_usdc_stroops));
         return true;
       }
       if (status.status === "expired" || status.status === "underpaid" || status.status === "overpaid") {
@@ -468,9 +474,11 @@ export default function PayPage({
       setNameInvalid(false);
       setEmailInvalid(false);
       const amountUsdcStroops =
-        link.amount_usdc_stroops ?? usdAmountToStroops(amount);
+        link.amount_usdc_stroops === null
+          ? usdAmountToStroops(amount)
+          : safeStroops(link.amount_usdc_stroops);
       if (amountUsdcStroops === null) {
-        setError("Enter a valid amount.");
+        setError(link.amount_usdc_stroops === null ? "Enter a valid amount." : "This payment link has an invalid amount.");
         setSubmitting(false);
         return;
       }
@@ -542,7 +550,7 @@ export default function PayPage({
     try {
       const status = await getPaymentStatus(slug, previous.payment_id);
       if (status.status === "confirmed") {
-        markConfirmed(previous.payment_id, status.transaction_id, previous.amount_usdc_stroops);
+        markConfirmed(previous.payment_id, status.transaction_id, safeStroops(previous.amount_usdc_stroops));
         return;
       }
       setCheckMessage(
@@ -608,7 +616,7 @@ export default function PayPage({
         timeoutMs: SUBMIT_TIMEOUT_MS,
       });
       if (result.status === "confirmed") {
-        markConfirmed(intent.payment_id, result.stellar_tx_hash ?? null, intent.amount_usdc_stroops);
+        markConfirmed(intent.payment_id, result.stellar_tx_hash ?? null, safeStroops(intent.amount_usdc_stroops));
         return;
       }
       throw new Error(
@@ -631,7 +639,7 @@ export default function PayPage({
     try {
       const status = await getPaymentStatus(slug, current.payment_id);
       if (status.status === "confirmed") {
-        markConfirmed(current.payment_id, status.transaction_id, current.amount_usdc_stroops);
+        markConfirmed(current.payment_id, status.transaction_id, safeStroops(current.amount_usdc_stroops));
         return true;
       }
       if (status.status === "pending") {

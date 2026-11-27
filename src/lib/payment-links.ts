@@ -4,7 +4,7 @@
 
 import { apiFetch, path } from "./api";
 import { parseAmount, toApiStroops } from "./amount";
-import type { AuthToken, WalletId } from "./brands";
+import type { AuthToken, WalletId, Stroops } from "./brands";
 import { pageQuery, type Paginated, type PageOpts } from "./pagination";
 import { isValidEmail } from "./validation";
 
@@ -17,10 +17,11 @@ export type PaymentLink = {
   description: string | null;
   image_url: string | null;
   redirect_url: string | null;
-  /** null means flexible: the payer chooses the amount. */
-  amount_usdc_stroops: number | null;
+  /** null means flexible: the payer chooses the amount. Decimal string on the wire. */
+  amount_usdc_stroops: Stroops | null;
   active: boolean;
-  collected_usdc_stroops: number;
+  /** Lifetime total collected. Decimal string on the wire. */
+  collected_usdc_stroops: Stroops;
   created_at: string;
   /** Full hosted checkout URL, e.g. `https://app.octo.dev/pay/ab12cd34ef`. */
   url: string;
@@ -56,7 +57,8 @@ export type PaymentLinkPayment = {
   id: string;
   payer_name: string | null;
   payer_email: string | null;
-  amount_usdc_stroops: number;
+  /** Decimal string on the wire. */
+  amount_usdc_stroops: Stroops;
   /** "pending" | "confirmed". */
   status: string;
   transaction_id: string | null;
@@ -133,11 +135,12 @@ export type PublicPaymentLink = {
   description: string | null;
   image_url: string | null;
   redirect_url: string | null;
-  amount_usdc_stroops: number | null;
-  /** Backend-enforced minimum for flexible links, in USDC stroops. Falls back to MIN_FLEXIBLE_USD. */
-  min_amount_usdc_stroops?: number | null;
-  /** Optional backend-enforced maximum for flexible links, in USDC stroops. */
-  max_amount_usdc_stroops?: number | null;
+  /** null means flexible. Decimal string on the wire. */
+  amount_usdc_stroops: Stroops | null;
+  /** Backend-enforced minimum for flexible links, in USDC stroops. Falls back to MIN_FLEXIBLE_USD. Decimal string on the wire. */
+  min_amount_usdc_stroops?: Stroops | null;
+  /** Optional backend-enforced maximum for flexible links, in USDC stroops. Decimal string on the wire. */
+  max_amount_usdc_stroops?: Stroops | null;
   deposit_address: string;
   asset_code: string;
 };
@@ -149,7 +152,8 @@ export function getPublicPaymentLink(slug: string) {
 export type PaymentIntent = {
   payment_id: string;
   deposit_address: string;
-  amount_usdc_stroops: number;
+  /** Decimal string on the wire. */
+  amount_usdc_stroops: Stroops;
   /** ISO timestamp after which the intent can no longer be paid, when the API provides it. */
   expires_at?: string | null;
 };
@@ -172,9 +176,10 @@ export type PaymentStatus = {
   /** "pending" | "confirmed" | "expired" | "underpaid" | "overpaid". */
   status: string;
   transaction_id: string | null;
-  expected_usdc_stroops: number;
-  /** What actually landed on-chain, once a deposit has been matched. */
-  received_usdc_stroops: number | null;
+  /** Decimal string on the wire. */
+  expected_usdc_stroops: Stroops;
+  /** What actually landed on-chain, once a deposit has been matched. Decimal string on the wire. */
+  received_usdc_stroops: Stroops | null;
 };
 
 export function getPaymentStatus(slug: string, paymentId: string) {
@@ -230,16 +235,17 @@ export function usdAmountToStroops(usd: string): number | null {
 /** Default minimum for flexible-amount links: $0.01 (10,000 stroops). */
 export const MIN_FLEXIBLE_USD = 0.01;
 
-/** Effective min/max (in USDC stroops) for a flexible link, falling back to MIN_FLEXIBLE_USD. */
+/** Effective min/max (in USDC stroops as strings) for a flexible link, falling back to MIN_FLEXIBLE_USD. */
 export function flexibleAmountBounds(link: PublicPaymentLink): {
-  minStroops: number;
-  maxStroops: number | null;
+  minStroops: Stroops;
+  maxStroops: Stroops | null;
 } {
-  const minStroops =
-    link.min_amount_usdc_stroops ?? Math.round(MIN_FLEXIBLE_USD * 10_000_000);
+  const minStroops: Stroops =
+    (link.min_amount_usdc_stroops as Stroops | null | undefined) ??
+    (String(Math.round(MIN_FLEXIBLE_USD * 10_000_000)) as Stroops);
   return {
     minStroops,
-    maxStroops: link.max_amount_usdc_stroops ?? null,
+    maxStroops: (link.max_amount_usdc_stroops as Stroops | null | undefined) ?? null,
   };
 }
 

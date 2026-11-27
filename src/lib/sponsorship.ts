@@ -6,22 +6,24 @@ import { apiFetch, path } from "./api";
 import { formatStroops } from "./amount";
 import { pageQuery, type PageOpts, type Paginated } from "./pagination";
 
-import type { AuthToken, WalletId } from "./brands";
+import type { AuthToken, WalletId, Stroops } from "./brands";
 
 export type { AuthToken, WalletId };
 
 export type SponsorshipConfig = {
   enabled: boolean;
-  per_tx_fee_cap_stroops: number | null;
-  daily_budget_stroops: number | null;
-  /** Fees already reserved/spent today, used to show remaining budget. */
-  spent_today_stroops: number;
+  /** Decimal string on the wire; null means no cap. */
+  per_tx_fee_cap_stroops: Stroops | null;
+  /** Decimal string on the wire; null means no daily limit. */
+  daily_budget_stroops: Stroops | null;
+  /** Fees already reserved/spent today. Decimal string on the wire. */
+  spent_today_stroops: Stroops;
 };
 
 export type SponsorshipConfigPayload = {
   enabled: boolean;
-  per_tx_fee_cap_stroops: number | null;
-  daily_budget_stroops: number | null;
+  per_tx_fee_cap_stroops: Stroops | null;
+  daily_budget_stroops: Stroops | null;
 };
 
 /** Fetch the gas sponsorship config for a single wallet. */
@@ -54,7 +56,8 @@ export type SponsoredTransaction = {
   wallet_id: string;
   inner_tx_hash: string;
   fee_bump_tx_hash: string | null;
-  fee_stroops: number;
+  /** Decimal string on the wire. */
+  fee_stroops: Stroops;
   status: string;
   error: string | null;
   created_at: string;
@@ -81,6 +84,6 @@ export function listSponsoredTransactions(
  * Format integer stroops as a human-readable XLM string (up to 7 dp, trailing zeros trimmed).
  * Stellar fees are tiny (base fee 100 stroops = 0.00001 XLM), so rounding to 2 dp hid them.
  */
-export function stroopsToXlm(stroops: number): string {
+export function stroopsToXlm(stroops: Stroops | number | bigint): string {
   return `${formatStroops(stroops)} XLM`;
 }
