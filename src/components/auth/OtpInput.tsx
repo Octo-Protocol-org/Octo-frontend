@@ -1,21 +1,26 @@
 "use client";
 
-import { useRef } from "react";
+import { useId, useRef } from "react";
 
-/** Six single-digit boxes acting as one 6-digit code; auto-advances on entry. */
+/** Six single-digit boxes acting as one 6-digit code; auto-advances on entry.
+ *  Exposed to assistive tech as one labelled group, so screen readers announce the
+ *  code's purpose (email verification, withdrawal confirmation, 2FA) and any error once. */
 export function OtpInput({
   value,
   onChange,
   disabled,
+  label = "Verification code",
   "aria-describedby": describedBy,
   "aria-invalid": invalid,
 }: {
   value: string;
   onChange: (code: string) => void;
   disabled?: boolean;
+  label?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: "true" | "false";
 }) {
+  const groupId = useId();
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
 
@@ -39,27 +44,33 @@ export function OtpInput({
   }
 
   return (
-    <div className="flex justify-center gap-2">
-      {digits.map((digit, i) => (
-        <input
-          key={i}
-          ref={(el) => {
-            inputs.current[i] = el;
-          }}
-          value={digit}
-          onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, "").slice(-1))}
-          onKeyDown={(e) => onKeyDown(i, e)}
-          onPaste={onPaste}
-          disabled={disabled}
-          inputMode="numeric"
-          autoComplete={i === 0 ? "one-time-code" : "off"}
-          aria-label={`Digit ${i + 1} of 6`}
-          aria-describedby={describedBy}
-          aria-invalid={invalid}
-          maxLength={1}
-          className="h-12 w-10 rounded-lg border border-border bg-surface-sunken text-center text-lg font-semibold text-foreground focus:border-burgundy-bright focus:outline-none disabled:opacity-60"
-        />
-      ))}
+    <div role="group" aria-labelledby={groupId} className="flex flex-col items-center">
+      <span id={groupId} className="sr-only">
+        {label}
+      </span>
+      <div className="flex justify-center gap-2">
+        {digits.map((digit, i) => (
+          <input
+            key={i}
+            ref={(el) => {
+              inputs.current[i] = el;
+            }}
+            value={digit}
+            onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, "").slice(-1))}
+            onKeyDown={(e) => onKeyDown(i, e)}
+            onPaste={onPaste}
+            disabled={disabled}
+            inputMode="numeric"
+            autoComplete={i === 0 ? "one-time-code" : "off"}
+            aria-label={`Digit ${i + 1} of 6`}
+            // Description + invalid live on the first box so an error is announced once, not 6×.
+            aria-describedby={i === 0 ? describedBy : undefined}
+            aria-invalid={i === 0 ? invalid : undefined}
+            maxLength={1}
+            className="h-12 w-10 rounded-lg border border-border bg-surface-sunken text-center text-lg font-semibold text-foreground focus:border-burgundy-bright focus:outline-none disabled:opacity-60"
+          />
+        ))}
+      </div>
     </div>
   );
 }

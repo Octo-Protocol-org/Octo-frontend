@@ -2,12 +2,20 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { CopyButton } from "@/components/CopyButton";
 
-export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  const digest = error.digest;
   useEffect(() => {
-    // Keep diagnostics in the server/client logs without exposing them to users.
-    console.error("Unhandled application error", { digest: "redacted" });
-  }, []);
+    // The digest is an opaque hash for correlating with server logs; it holds no message or stack.
+    console.error("Unhandled application error", { digest: error.digest });
+  }, [error.digest]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-center">
@@ -17,6 +25,13 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
         <p className="mt-3 text-sm leading-6 text-muted">
           Octo could not finish loading this page. Your wallet and keys are safe. Try again or return home.
         </p>
+        {digest && (
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs text-muted">
+            <span>Reference:</span>
+            <code className="break-all font-mono text-foreground">{digest}</code>
+            <CopyButton value={digest} label="Copy reference" />
+          </div>
+        )}
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <button
             type="button"
