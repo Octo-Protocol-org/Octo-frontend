@@ -158,7 +158,7 @@ export function ForgotPasswordForm() {
           <p className="text-sm text-muted">
             If an account exists for that email, we sent a 6-digit code to it.
           </p>
-          <OtpInput value={code} onChange={setCode} />
+          <OtpInput value={code} onChange={setCode} label="Password reset code" />
           <button
             type="button"
             onClick={onResend}

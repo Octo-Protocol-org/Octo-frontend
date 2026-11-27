@@ -17,6 +17,7 @@ import { listSessions, revokeSession, revokeOtherSessions, type Session } from "
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PageSpinner } from "@/components/OctoSpinner";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
+import { TwoFactorForm } from "@/components/settings/TwoFactorForm";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,11 @@ export default function SettingsPage() {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
+  // Sync with the user object on initial load; onStatusChange keeps it up-to-date after that.
+  useEffect(() => {
+    setTwoFactorEnabled(user?.two_factor_enabled ?? false);
+  }, [user]);
 
 
 
@@ -215,7 +221,13 @@ export default function SettingsPage() {
         </div>
       )}
       {token && <ChangePasswordForm token={token} />}
-
+      {token && (
+        <TwoFactorForm
+          token={token}
+          twoFactorEnabled={twoFactorEnabled}
+          onStatusChange={setTwoFactorEnabled}
+        />
+      )}
     </DashboardShell>
   );
 }

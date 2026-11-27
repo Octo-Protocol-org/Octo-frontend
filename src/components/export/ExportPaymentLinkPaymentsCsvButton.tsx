@@ -1,6 +1,6 @@
 "use client";
 
-import { ExportCsvButton } from "./ExportCsvButton";
+import { ExportCsvButton, type CsvExportContext } from "./ExportCsvButton";
 import { fetchAllPages, type CsvColumn } from "@/lib/csv";
 import { formatStroops } from "@/lib/amount";
 import { asAuthToken, asWalletId } from "@/lib/brands";
@@ -25,10 +25,16 @@ export function ExportPaymentLinkPaymentsCsvButton({
   walletId: string;
   linkId: string;
 }) {
-  async function load() {
+  async function load({ signal, onProgress }: CsvExportContext): Promise<PaymentLinkPayment[]> {
     if (!token) throw new Error("Not signed in.");
-    return fetchAllPages((before) =>
-      listPaymentLinkPayments(asAuthToken(token), asWalletId(walletId), linkId, { before, limit: 200 }),
+    return fetchAllPages(
+      (before, sig) =>
+        listPaymentLinkPayments(asAuthToken(token), asWalletId(walletId), linkId, {
+          before,
+          limit: 200,
+          signal: sig,
+        }),
+      { signal, onProgress },
     );
   }
 
