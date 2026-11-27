@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@/lib/api";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/dashboard/Modal";
 import {
@@ -12,6 +12,7 @@ import {
   unlockBackup,
 } from "@/lib/sdk";
 import { assessPassword, PasswordStrengthMeter, MIN_PASSWORD_LENGTH, type PasswordAssessment } from "@/lib/passwordStrength";
+import { useAuth } from "@/lib/useAuth";
 
 /**
  * Change the wallet's encryption password:
@@ -28,15 +29,19 @@ export function ChangeWalletPasswordModal({
   token,
   walletId,
   walletAddress,
+  walletLabel,
   onClose,
   onDone,
 }: {
   token: string;
   walletId: string;
   walletAddress?: string;
+  /** Used as a personal-info penalty when scoring the new password (issue #682). */
+  walletLabel?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { user } = useAuth();
   const currentPasswordId = useId();
   const newPasswordId = useId();
   const confirmPasswordId = useId();
@@ -46,19 +51,23 @@ export function ChangeWalletPasswordModal({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pwFeedback, setPwFeedback] = useState<string[]>([]);
   const [pwAssessment, setPwAssessment] = useState<PasswordAssessment | null>(null);
   const [done, setDone] = useState(false);
 
-  async function handlePasswordChange(value: string) {
-    setNewPassword(value);
-    if (!value) { setPwFeedback([]); setPwAssessment(null); return; }
-    try {
-      const result = await assessPassword(value);
-      setPwFeedback(result.feedback);
-      setPwAssessment(result);
-    } catch { setPwFeedback([]); setPwAssessment(null); }
-  }
+  // Personal-info inputs fed to the estimator so e.g. the wallet name lowers the score.
+  const userInputs = [walletLabel ?? "", user?.email ?? "", user?.username ?? ""];
+
+  // Stale-result guard: discard results from earlier keystrokes (issue #682).
+  const assessGenRef = useRef(0);
+  useEffect(() => {
+    if (!newPassword) { setPwAssessment(null); return; }
+    const gen = ++assessGenRef.current;
+    assessPassword(newPassword, userInputs)
+      .then((r) => { if (assessGenRef.current === gen) setPwAssessment(r); })
+      .catch(() => { if (assessGenRef.current === gen) setPwAssessment(null); });
+  // userInputs is derived from stable values; include the string join for the dep array.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newPassword, userInputs.join("\u0000")]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +88,7 @@ export function ChangeWalletPasswordModal({
     // password we couldn't vet.
     let assessment: PasswordAssessment;
     try {
-      assessment = await assessPassword(newPassword);
+      assessment = await assessPassword(newPassword, userInputs);
     } catch {
       setError("Couldn't check password strength. Check your connection and try again.");
       return;
@@ -145,6 +154,21 @@ export function ChangeWalletPasswordModal({
         works. On other devices, the cached backup refreshes automatically on the next unlock.
       </p>
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {/*
+          Hidden username scoped to this wallet so password managers store wallet passwords
+          separately from the account login credential (issue #683).
+        */}
+        {walletAddress && (
+          <input
+            type="text"
+            readOnly
+            aria-hidden="true"
+            tabIndex={-1}
+            autoComplete="username"
+            value={`wallet:${walletAddress}`}
+            className="sr-only"
+          />
+        )}
         <div>
           <label htmlFor={currentPasswordId} className="text-xs text-muted">Current password</label>
           <input
@@ -165,21 +189,14 @@ export function ChangeWalletPasswordModal({
             id={newPasswordId}
             type="password"
             value={newPassword}
-            onChange={(e) => handlePasswordChange(e.target.value)}
+            onChange={(e) => setNewPassword(e.target.value)}
             placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
             autoComplete="new-password"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : undefined}
             className="mt-1 w-full rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-burgundy-bright focus:outline-none"
           />
-          {pwAssessment && (
-            <PasswordStrengthMeter id="new-wallet-password-strength" assessment={pwAssessment} />
-          )}
-          {pwFeedback.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-xs text-muted">
-              {pwFeedback.map((f, i) => <li key={i}>· {f}</li>)}
-            </ul>
-          )}
+          <PasswordStrengthMeter id="change-wallet-pw-strength" assessment={newPassword ? pwAssessment : null} />
         </div>
         <div>
           <label htmlFor={confirmPasswordId} className="text-xs text-muted">Confirm new password</label>

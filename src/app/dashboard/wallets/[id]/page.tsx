@@ -481,6 +481,7 @@ export default function WalletOverview({
           token={token}
           walletId={id}
           walletAddress={wallet?.address}
+          walletLabel={wallet?.label}
           onClose={() => setShowChangePassword(false)}
           onDone={() => setShowChangePassword(false)}
         />

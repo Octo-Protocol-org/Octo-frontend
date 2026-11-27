@@ -1,14 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { signup, login, verifyEmail, resendOtp, needsVerification, needsTwoFactor, saveToken, verify2fa } from "@/lib/auth";
 import { errorMessage } from "@/lib/api";
 import { safeNextPath } from "@/lib/safeNext";
-import { assessPassword, MIN_PASSWORD_SCORE } from "@/lib/passwordStrength";
+import { assessPassword, preloadPasswordEstimator, PasswordStrengthMeter, MIN_PASSWORD_SCORE, type PasswordAssessment } from "@/lib/passwordStrength";
 import { isValidEmail } from "@/lib/validation";
 import { OtpInput } from "./OtpInput";
+
+/** Tick the cooldown down once a second while `deadline > 0`; clears on unmount. */
+function useCooldown(): [number, (seconds: number) => void] {
+  const [deadline, setDeadline] = useState(0);
+  const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  useEffect(() => {
+    if (deadline <= 0) return;
+    const id = setInterval(() => {
+      if (Date.now() >= deadline) clearInterval(id);
+      // Force a re-render so `remaining` recomputes.
+      setDeadline((d) => d);
+    }, 500);
+    return () => clearInterval(id);
+  }, [deadline]);
+  const start = (seconds: number) => setDeadline(Date.now() + seconds * 1000);
+  return [remaining, start];
+}
 
 type Mode = "signup" | "login";
 type Step = "credentials" | "verify" | "twofactor";
@@ -30,12 +47,15 @@ export function AuthForm({
   const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pwStrength, setPwStrength] = useState<PasswordAssessment | null>(null);
   const [userId, setUserId] = useState("");
   const [challengeId, setChallengeId] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  // Deadline-based cooldown: no interval leak, can't go negative (issue #680).
+  const [resendCooldown, startResendCooldown] = useCooldown();
 
   const isSignup = mode === "signup";
 
@@ -47,15 +67,15 @@ export function AuthForm({
     window.location.assign(safeNextPath(next) ?? "/dashboard");
   }
 
-  function startCooldown() {
-    setResendCooldown(RESEND_COOLDOWN_SECS);
-    const id = setInterval(() => {
-      setResendCooldown((s) => {
-        if (s <= 1) clearInterval(id);
-        return s - 1;
-      });
-    }, 1000);
-  }
+  // Live strength estimate for signup; stale results from earlier keystrokes are discarded.
+  useEffect(() => {
+    if (!isSignup || !password) { setPwStrength(null); return; }
+    let current = true;
+    assessPassword(password, [email.trim()])
+      .then((r) => { if (current) setPwStrength(r); })
+      .catch(() => { if (current) setPwStrength(null); });
+    return () => { current = false; };
+  }, [isSignup, password, email]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,10 +90,21 @@ export function AuthForm({
       setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
-    if (isSignup) { const a = await assessPassword(password, [normalizedEmail]); if (a.score < MIN_PASSWORD_SCORE) {
-      setError("Please choose a stronger password.");
-      return;
-    }}
+    // Assess strength on submit; fail closed if the estimator can't load (issue #681).
+    if (isSignup) {
+      let assessment: PasswordAssessment;
+      try {
+        assessment = await assessPassword(password, [normalizedEmail]);
+      } catch {
+        setError("Couldn't check password strength. Check your connection and try again.");
+        return;
+      }
+      setPwStrength(assessment);
+      if (assessment.score < MIN_PASSWORD_SCORE) {
+        setError("Please choose a stronger password.");
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -85,7 +116,7 @@ export function AuthForm({
       } else if (needsVerification(result)) {
         setUserId(result.user_id);
         setStep("verify");
-        startCooldown();
+        startResendCooldown(RESEND_COOLDOWN_SECS);
       } else {
         finish(result.token);
       }
@@ -138,16 +169,19 @@ export function AuthForm({
   }
 
   async function onResend() {
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || resending) return;
     setError(null);
+    setResending(true);
     try {
       await resendOtp(userId);
-      startCooldown();
+      startResendCooldown(RESEND_COOLDOWN_SECS);
       toast.success("A new code is on its way.");
     } catch (err) {
       const message = errorMessage(err, "Could not resend the code.");
       setError(message);
       toast.error(message);
+    } finally {
+      setResending(false);
     }
   }
 
@@ -289,13 +323,17 @@ export function AuthForm({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onFocus={isSignup ? preloadPasswordEstimator : undefined}
               placeholder={isSignup ? "Create a password (8+ chars)" : "Enter your password"}
               autoComplete={isSignup ? "new-password" : "current-password"}
               aria-invalid={error ? "true" : "false"}
-              aria-describedby={error ? "auth-error" : undefined}
+              aria-describedby={error ? "auth-error" : isSignup ? "auth-pw-strength" : undefined}
               className="w-full bg-transparent text-sm text-foreground placeholder:text-muted/60 focus:outline-none"
             />
           </div>
+          {isSignup && (
+            <PasswordStrengthMeter id="auth-pw-strength" assessment={password ? pwStrength : null} />
+          )}
 
           {!isSignup && <Link href="/forgot-password" className="mt-2 inline-block text-xs text-muted hover:text-foreground">Forgot password?</Link>}
         </div>

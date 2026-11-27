@@ -323,6 +323,19 @@ export function NewWalletClient() {
                     lose both this password and your recovery phrase, your funds are
                     unrecoverable. A passphrase of several unrelated words works well.
                   </p>
+                  {/*
+                    Hidden username tells password managers this credential is a wallet-
+                    specific password, not the account login (issue #683).
+                  */}
+                  <input
+                    type="text"
+                    readOnly
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    autoComplete="username"
+                    value="wallet:new"
+                    className="sr-only"
+                  />
                   <input
                     id="wallet-password"
                     type="password"
