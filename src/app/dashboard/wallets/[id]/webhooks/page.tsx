@@ -425,6 +425,3 @@ export default function WalletWebhooksPage() {
     </WalletPageShell>
   );
 }
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>

@@ -100,4 +100,55 @@ describe("sep7PayUri", () => {
     expect(params.get("memo")).toBe("hello world");
     expect(params.get("memo_type")).toBe("MEMO_TEXT");
   });
+
+  it("includes a MEMO_ID of 0 (not dropped as falsy)", () => {
+    const uri = sep7PayUri({ destination: DESTINATION, memoId: 0 });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.get("memo")).toBe("0");
+    expect(params.get("memo_type")).toBe("MEMO_ID");
+  });
+
+  it("includes a MEMO_ID as a string of digits", () => {
+    const uri = sep7PayUri({ destination: DESTINATION, memoId: "12345678901234567" });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.get("memo")).toBe("12345678901234567");
+    expect(params.get("memo_type")).toBe("MEMO_ID");
+  });
+
+  it("omits an empty memo", () => {
+    const uri = sep7PayUri({ destination: DESTINATION, memo: "", memoType: "MEMO_TEXT" });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.has("memo")).toBe(false);
+    expect(params.has("memo_type")).toBe(false);
+  });
+
+  it("omits asset params when the code has no issuer", () => {
+    const uri = sep7PayUri({ destination: DESTINATION, assetCode: "USDC" });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.has("asset_code")).toBe(false);
+    expect(params.has("asset_issuer")).toBe(false);
+  });
+
+  it("omits asset params when the issuer has no code", () => {
+    const uri = sep7PayUri({ destination: DESTINATION, assetIssuer: ISSUER });
+    const params = new URLSearchParams(uri.split("?")[1]);
+    expect(params.has("asset_code")).toBe(false);
+    expect(params.has("asset_issuer")).toBe(false);
+  });
+
+  it("URL-encodes special characters in a MEMO_TEXT", () => {
+    const uri = sep7PayUri({
+      destination: DESTINATION,
+      memo: "café & co?",
+      memoType: "MEMO_TEXT",
+    });
+    const query = uri.slice(uri.indexOf("?") + 1);
+    expect(query).toContain("memo=caf%C3%A9+%26+co%3F");
+    // And it still round-trips through a URLSearchParams parse.
+    expect(new URLSearchParams(query).get("memo")).toBe("café & co?");
+  });
+
+  it("rejects a memoId that is not decimal", () => {
+    expect(() => sep7PayUri({ destination: DESTINATION, memoId: "12a" })).toThrow();
+  });
 });

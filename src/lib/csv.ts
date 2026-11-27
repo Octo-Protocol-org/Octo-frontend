@@ -12,10 +12,16 @@ export function escapeCsvCell(input: string | number | null | undefined): string
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/** Header + one string per row, so a huge export never holds both the objects and one giant string. */
+export function buildCsvParts<T>(rows: T[], columns: CsvColumn<T>[]): string[] {
+  return [
+    columns.map((c) => escapeCsvCell(c.header)).join(","),
+    ...rows.map((r) => columns.map((c) => escapeCsvCell(c.value(r))).join(",")),
+  ];
+}
+
 export function buildCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
-  const head = columns.map((c) => escapeCsvCell(c.header)).join(",");
-  const body = rows.map((r) => columns.map((c) => escapeCsvCell(c.value(r))).join(","));
-  return [head, ...body].join("\r\n") + "\r\n";
+  return buildCsvParts(rows, columns).join("\r\n") + "\r\n";
 }
 
 /** Trigger a browser download. The URL is revoked later, since Safari can cancel a download whose URL is gone. */
@@ -35,16 +41,38 @@ export function downloadCsv(filename: string, csv: string): void {
   downloadBlob(filename, new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" }));
 }
 
-/** Walk every cursor page, capped so a misbehaving cursor cannot loop forever. */
+/** Same as `downloadCsv`, but takes pre-built parts so the full string is never materialised. */
+export function downloadCsvParts(filename: string, parts: string[]): void {
+  downloadBlob(filename, new Blob(["", ...parts], { type: "text/csv;charset=utf-8" }));
+}
+
+/** Options for `fetchAllPages`. */
+export type FetchAllPagesOptions = {
+  /** Hard cap so a misbehaving cursor cannot loop forever. */
+  maxPages?: number;
+  /** Aborts the walk; the in-flight `fetchPage` should receive it and reject with `AbortError`. */
+  signal?: AbortSignal;
+  /** Reports the row count accumulated so far, once per page. */
+  onProgress?: (rowsSoFar: number) => void;
+};
+
+/** Walk every cursor page, capped, cancellable and observable. */
 export async function fetchAllPages<T>(
-  fetchPage: (before: string | null) => Promise<{ data: T[]; next_cursor: string | null }>,
-  maxPages = 1000,
+  fetchPage: (
+    before: string | null,
+    signal?: AbortSignal,
+  ) => Promise<{ data: T[]; next_cursor: string | null }>,
+  { maxPages = 1000, signal, onProgress }: FetchAllPagesOptions = {},
 ): Promise<T[]> {
   const all: T[] = [];
   let before: string | null = null;
   for (let i = 0; i < maxPages; i++) {
-    const page = await fetchPage(before);
+    signal?.throwIfAborted();
+    const page = await fetchPage(before, signal);
     all.push(...page.data);
+    onProgress?.(all.length);
+    // The page resolved, but the user may have cancelled while it was in flight.
+    signal?.throwIfAborted();
     if (!page.next_cursor || page.next_cursor === before) break;
     before = page.next_cursor;
   }
