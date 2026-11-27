@@ -1,16 +1,31 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+// Hook tests (`use*.test.ts`) and component tests (`*.test.tsx`) need a DOM; everything else runs in Node.
+const DOM_TESTS = ["src/**/*.test.tsx", "src/**/use*.test.ts"];
+
 // Mirror tsconfig's `@/*` path alias so tests resolve the same imports as the app.
 export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  esbuild: { jsx: "automatic" },
   test: {
+    setupFiles: ["./src/test/setup.ts"],
+    projects: [
+      {
+        extends: true,
+        test: { name: "node", environment: "node", include: ["src/**/*.test.ts"], exclude: DOM_TESTS },
+      },
+      {
+        extends: true,
+        test: { name: "dom", environment: "happy-dom", include: DOM_TESTS },
+      },
+    ],
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts", "src/proxy.ts"],
-      exclude: ["**/*.test.ts", "src/lib/**/use*.ts", "src/lib/**/use*.tsx"],
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "src/test/**", "src/lib/**/use*.ts", "src/lib/**/use*.tsx"],
       all: true,
       reporter: ["text", "text-summary", "html"],
       thresholds: {

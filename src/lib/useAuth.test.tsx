@@ -1,38 +1,22 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
 import { isAuthenticationFailure } from "./useAuth";
 
 const replaceMock = vi.fn();
 const refreshMock = vi.fn();
+const pathnameMock = vi.fn(() => "/dashboard");
+
+// A stable router object, as Next provides, so effects keyed on it don't re-run every render.
+const router = { replace: replaceMock, refresh: refreshMock, push: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() };
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: replaceMock,
-    refresh: refreshMock,
-    push: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    prefetch: vi.fn(),
-  }),
+  usePathname: () => pathnameMock(),
+  useRouter: () => router,
 }));
 
 const meMock = vi.fn();
-const loginMock = vi.fn();
-const logoutMock = vi.fn();
-
-vi.mock("./api", async () => {
-  const actual = await vi.importActual<typeof import("./api")>("./api");
-  return {
-    ...actual,
-    me: (...args: unknown[]) => meMock(...args),
-    login: (...args: unknown[]) => loginMock(...args),
-    logout: (...args: unknown[]) => logoutMock(...args),
-  };
-});
-
-const clearTokenMock = vi.fn();
 const getTokenMock = vi.fn();
 const logoutCurrentSessionMock = vi.fn();
 const signOutMock = vi.fn();
@@ -40,9 +24,8 @@ const broadcastLogoutMock = vi.fn();
 const subscribeToLogoutMock = vi.fn();
 
 vi.mock("./auth", () => ({
-  clearToken: (...args: unknown[]) => clearTokenMock(...args),
+  me: (...args: unknown[]) => meMock(...args),
   getToken: (...args: unknown[]) => getTokenMock(...args),
-  setToken: vi.fn(),
   logoutCurrentSession: (...args: unknown[]) => logoutCurrentSessionMock(...args),
   signOut: (...args: unknown[]) => signOutMock(...args),
   broadcastLogout: (...args: unknown[]) => broadcastLogoutMock(...args),
@@ -78,23 +61,15 @@ describe("useAuth session handling", () => {
     replaceMock.mockReset();
     refreshMock.mockReset();
     meMock.mockReset();
-    loginMock.mockReset();
-    logoutMock.mockReset();
-    clearTokenMock.mockReset();
     getTokenMock.mockReset();
     logoutCurrentSessionMock.mockReset();
     signOutMock.mockReset();
     broadcastLogoutMock.mockReset();
     subscribeToLogoutMock.mockReset();
     getTokenMock.mockReturnValue("token");
+    subscribeToLogoutMock.mockReturnValue(() => {});
     meMock.mockResolvedValue({ id: "1", email: "user@example.com" });
-    logoutMock.mockResolvedValue(undefined);
     logoutCurrentSessionMock.mockResolvedValue(undefined);
-    signOutMock.mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("redirects to /login exactly once when several 401s arrive together", async () => {
@@ -113,12 +88,11 @@ describe("useAuth session handling", () => {
     });
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith("/login");
+      expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard&reason=expired");
     });
 
     expect(replaceMock).toHaveBeenCalledTimes(1);
-    expect(clearTokenMock).toHaveBeenCalled();
-    expect(logoutMock).toHaveBeenCalledTimes(1);
+    expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(logoutCurrentSessionMock).not.toHaveBeenCalled();
   });
 
@@ -141,8 +115,9 @@ describe("useAuth session handling", () => {
     });
 
     expect(logoutCurrentSessionMock).toHaveBeenCalledWith("token");
-    expect(clearTokenMock).toHaveBeenCalled();
-    expect(replaceMock).toHaveBeenCalledWith("/login");
+    expect(signOutMock).toHaveBeenCalled();
+    expect(broadcastLogoutMock).toHaveBeenCalled();
+    expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
   });
 
   it("still signs out locally when the server revoke request fails", async () => {
@@ -161,28 +136,17 @@ describe("useAuth session handling", () => {
     });
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith("/login");
+      expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
     });
 
-    expect(clearTokenMock).toHaveBeenCalled();
+    expect(signOutMock).toHaveBeenCalled();
     expect(result.current.user).toBeNull();
   });
 
   it("includes the query string and hash in the encoded next param", async () => {
-    const originalLocation = window.location;
-
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      writable: true,
-      value: {
-        ...originalLocation,
-        pathname: "/dashboard/wallets/abc/transactions",
-        search: "?before=xyz",
-        hash: "#top",
-        href: "http://localhost/dashboard/wallets/abc/transactions?before=xyz#top",
-        origin: "http://localhost",
-      },
-    });
+    // happy-dom provides a real location, so set the URL instead of redefining window.location.
+    window.history.replaceState(null, "", "/dashboard/wallets/abc/transactions?before=xyz#top");
+    pathnameMock.mockReturnValue("/dashboard/wallets/abc/transactions");
 
     try {
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -205,11 +169,8 @@ describe("useAuth session handling", () => {
         expect(replaceMock).toHaveBeenCalledWith(`/login?next=${expectedNext}`);
       });
     } finally {
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        writable: true,
-        value: originalLocation,
-      });
+      window.history.replaceState(null, "", "/");
+      pathnameMock.mockReturnValue("/dashboard");
     }
   });
 
@@ -236,8 +197,8 @@ describe("useAuth session handling", () => {
       expect(result.current.user).toBeNull();
     });
 
-    expect(clearTokenMock).toHaveBeenCalled();
-    expect(replaceMock).toHaveBeenCalledWith("/login");
+    expect(signOutMock).toHaveBeenCalled();
+    expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
     expect(replaceMock).toHaveBeenCalledTimes(1);
     expect(logoutCurrentSessionMock).not.toHaveBeenCalled();
   });

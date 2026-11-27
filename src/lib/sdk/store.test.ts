@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment happy-dom
+import { describe, expect, it, vi } from "vitest";
 import { clearLocalBackups, loadLocalBackup, saveLocalBackup, versionOf } from "./store";
 
 const backup = {
@@ -11,27 +12,30 @@ const backup = {
 };
 
 describe("wallet backup storage", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("falls back cleanly when storage reads and writes throw", () => {
-    const warning = vi.fn();
-    const throwingStorage = {
-      getItem: () => { throw new DOMException("blocked", "SecurityError"); },
-      setItem: () => { throw new DOMException("blocked", "SecurityError"); },
-      removeItem: () => { throw new DOMException("blocked", "SecurityError"); },
-    };
-    vi.stubGlobal("localStorage", throwingStorage);
-    vi.stubGlobal("window", {
-      dispatchEvent: warning,
-    });
+    const warning = vi.spyOn(window, "dispatchEvent");
+    const blocked = () => { throw new DOMException("blocked", "SecurityError"); };
+    // Simulate a browser policy that blocks storage access.
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, "key").mockImplementation(blocked);
 
     expect(() => saveLocalBackup("wallet-1", backup)).not.toThrow();
     expect(saveLocalBackup("wallet-1", backup)).toBe(false);
     expect(loadLocalBackup("wallet-1")).toBeNull();
     expect(() => clearLocalBackups()).not.toThrow();
     expect(warning).toHaveBeenCalled();
+  });
+
+  it("clears every backup key and leaves unrelated keys", () => {
+    localStorage.setItem("unrelated", "keep");
+    expect(saveLocalBackup("wallet-1", backup, "v1")).toBe(true);
+    expect(saveLocalBackup("wallet-2", backup, "v2")).toBe(true);
+    expect(localStorage.length).toBe(3);
+    clearLocalBackups();
+    expect(localStorage.getItem("octo_wallet_backup_wallet-1")).toBeNull();
+    expect(localStorage.getItem("octo_wallet_backup_wallet-2")).toBeNull();
+    expect(localStorage.getItem("unrelated")).toBe("keep");
   });
 });
 

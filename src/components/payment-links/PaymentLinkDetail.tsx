@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@/lib/api";
-import { payUrl } from "@/lib/format";
+import { paymentLinkUrl } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Modal, CopyField } from "@/components/dashboard/Modal";
 import { formatStroops } from "@/lib/amount";
@@ -79,8 +79,8 @@ export function PaymentLinkDetail({
             ${formatStroops(link.collected_usdc_stroops)}
           </p>
         </div>
-        <CopyField label="Public link" value={link.url ?? payUrl(link.slug)} qr />
-        <PayWithOctoSnippet url={link.url ?? payUrl(link.slug)} />
+        <CopyField label="Public link" value={paymentLinkUrl(link)} qr />
+        <PayWithOctoSnippet url={paymentLinkUrl(link)} />
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-lg bg-surface-sunken p-3">
             <p className="text-muted">Amount</p>

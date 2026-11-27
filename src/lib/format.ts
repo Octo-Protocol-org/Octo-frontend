@@ -1,11 +1,26 @@
 /** Display helpers that more than one page or component needs. */
 
-import { network } from "@/lib/network";
+/** Public checkout URL for a payment link slug, or null for an empty or dot-segment slug. Falls back to a path during SSR. */
+export function payUrl(slug: string): string | null {
+  if (!slug || slug === "." || slug === "..") return null;
+  // Encode the slug so `/`, `?` or `#` can't point the link (or its QR code) at another page.
+  const pathname = `/pay/${encodeURIComponent(slug)}`;
+  if (typeof window === "undefined") return pathname;
+  return `${window.location.origin}${pathname}`;
+}
 
-/** Public checkout URL for a payment link slug. Falls back to a path during SSR. */
-export function payUrl(slug: string): string {
-  if (typeof window === "undefined") return `/pay/${slug}`;
-  return `${window.location.origin}/pay/${slug}`;
+/** Shareable URL for a payment link: the server's URL if it is http(s), else the checkout URL built from the slug. */
+export function paymentLinkUrl(link: { url?: string | null; slug: string }): string {
+  if (link.url) {
+    try {
+      const parsed = new URL(link.url);
+      // Never hand a `javascript:` or other scheme to a QR code or a merchant's embed snippet.
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") return parsed.href;
+    } catch {
+      // Not a URL at all; fall back to the slug.
+    }
+  }
+  return payUrl(link.slug) ?? "";
 }
 
 /** Countdown from milliseconds. Shows hours only when there are any. */
@@ -28,10 +43,4 @@ export function shortenTxHash(hash: string): string {
   const trimmed = hash.trim();
   if (trimmed.length <= 12) return trimmed;
   return `${trimmed.slice(0, 4)}…${trimmed.slice(-4)}`;
-}
-
-/** Stellar Expert transaction URL for the current network. */
-export function explorerTxUrl(hash: string): string {
-  const net = network === "mainnet" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${net}/tx/${encodeURIComponent(hash.trim())}`;
 }

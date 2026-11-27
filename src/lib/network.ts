@@ -4,6 +4,8 @@
  * An unknown value throws at module-load time so the build fails fast.
  */
 
+import { isValidStellarAddress } from "./stellar/address";
+
 const raw = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
 
 type NetworkConfig = {
@@ -66,12 +68,16 @@ export function usdcForNetwork(passphrase: string): { code: string; issuer: stri
   return configForPassphrase(passphrase).usdc;
 }
 
-/** Returns the stellar.expert URL for a transaction hash. */
-export function explorerTxUrl(hash: string): string {
-  return `${network.explorerBase}/tx/${hash}`;
+/** Returns the stellar.expert URL for a transaction hash, or null if it isn't a 64-hex-char hash. */
+export function explorerTxUrl(hash: string): string | null {
+  const value = hash.trim();
+  if (!/^[0-9a-f]{64}$/i.test(value)) return null;
+  return `${network.explorerBase}/tx/${encodeURIComponent(value)}`;
 }
 
-/** Returns the stellar.expert URL for an account address. */
-export function explorerAccountUrl(address: string): string {
-  return `${network.explorerBase}/account/${address}`;
+/** Returns the stellar.expert URL for an account address, or null if it isn't a valid G…/M… address. */
+export function explorerAccountUrl(address: string): string | null {
+  const value = address.trim();
+  if (!isValidStellarAddress(value)) return null;
+  return `${network.explorerBase}/account/${encodeURIComponent(value)}`;
 }

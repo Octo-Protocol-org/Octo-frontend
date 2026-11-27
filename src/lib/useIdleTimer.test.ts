@@ -112,19 +112,19 @@ describe("#287/#646 useIdleTimer — timer logic", () => {
     expect(onIdle).toHaveBeenCalledOnce();
   });
 
-  it("exposes a remaining-seconds value that decreases while warning", () => {
+  it("exposes a remaining-time value that decreases while warning", () => {
     const { hook } = setup();
 
     act(() => {
       vi.advanceTimersByTime(TIMEOUT - WARN_BEFORE);
     });
-    const first = hook.result.current.remainingSeconds;
+    const first = hook.result.current.remainingMs;
     expect(first).toBeGreaterThan(0);
 
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(hook.result.current.remainingSeconds).toBeLessThan(first);
+    expect(hook.result.current.remainingMs).toBeLessThan(first);
   });
 });
 
@@ -297,7 +297,7 @@ describe("#644 useIdleTimer — cross-tab coordination", () => {
     });
 
     // Tab B should no longer be in the warning window.
-    expect(tabB.hook.result.current.remainingSeconds).toBeGreaterThan(WARN_BEFORE / 1000);
+    expect(tabB.hook.result.current.remainingMs).toBeGreaterThan(WARN_BEFORE);
 
     // Neither tab idles at the original deadline.
     act(() => {

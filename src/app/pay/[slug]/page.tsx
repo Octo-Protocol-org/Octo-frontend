@@ -25,7 +25,7 @@ import { OctoSpinner } from "@/components/OctoSpinner";
 import { PayerPrivacyNotice } from "@/components/checkout/PayerPrivacyNotice";
 import confetti from "canvas-confetti";
 import { formatStroops, parseAmount } from "@/lib/amount";
-import { explorerTxUrl } from "@/lib/explorer";
+import { explorerTxUrl } from "@/lib/network";
 import { ApiError, errorMessage } from "@/lib/api";
 import { friendlyResultMessage } from "@/lib/stellar/resultCodes";
 import { isTrustedImageUrl } from "@/lib/isTrustedImageUrl";
@@ -1012,7 +1012,7 @@ export default function PayPage({
                     </span>{" "}
                     ·{" "}
                     <a
-                      href={explorerTxUrl(signedTxHash)}
+                      href={explorerTxUrl(signedTxHash) ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-foreground underline hover:no-underline"
@@ -1081,7 +1081,7 @@ export default function PayPage({
                 )}
                 {txRef && isStellarTxHash(txRef) && (
                   <a
-                    href={explorerTxUrl(txRef)}
+                    href={explorerTxUrl(txRef) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-block text-xs font-medium text-foreground underline hover:no-underline"

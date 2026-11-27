@@ -83,22 +83,22 @@ describe("payment-links path encoding", () => {
     expect(lastUrl()).toContain("/v1/pay/a%2Fb");
   });
 
-  it("encodes dot-dot in a public link slug", async () => {
-    vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: {} }));
-    await getPublicPaymentLink("..");
-    expect(lastUrl()).toContain("/v1/pay/%2E%2E");
+  // `%2E%2E` is still a dot-segment to URL parsers, so a bare `..` is refused before any request.
+  it("refuses a dot-dot public link slug without making a request", async () => {
+    await expect(getPublicPaymentLink("..")).rejects.toThrow("Invalid request path.");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("encodes slash and dot-dot in a wallet-scoped link id", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: {} }));
     await getPaymentLink(TOKEN, WALLET_ID, "../x");
-    expect(lastUrl()).toContain("/v1/wallets/wallet_1/payment-links/%2E%2Ex");
+    expect(lastUrl()).toContain("/v1/wallets/wallet_1/payment-links/..%2Fx");
   });
 
   it("encodes slash and dot-dot in a payment id", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: {} }));
     await getPaymentStatus("slug", "../pay");
-    expect(lastUrl()).toContain("/v1/pay/slug/payments/%2E%2Epay");
+    expect(lastUrl()).toContain("/v1/pay/slug/payments/..%2Fpay");
   });
 
   it("encodes slash and dot-dot in submitPublicPayment", async () => {
@@ -123,30 +123,30 @@ describe("payment-links path encoding", () => {
   it("encodes slash and dot-dot in wallet id for listPaymentLinksPage", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: { data: [] } }));
     await listPaymentLinksPage(TOKEN, "../w" as WalletId);
-    expect(lastUrl()).toContain("/v1/wallets/%2E%2Ew/payment-links");
+    expect(lastUrl()).toContain("/v1/wallets/..%2Fw/payment-links");
   });
 
   it("encodes slash and dot-dot in wallet id for listRecentPaymentLinks", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: { data: [] } }));
     await listRecentPaymentLinks(TOKEN, "../w" as WalletId);
-    expect(lastUrl()).toContain("/v1/wallets/%2E%2Ew/payment-links");
+    expect(lastUrl()).toContain("/v1/wallets/..%2Fw/payment-links");
   });
 
   it("encodes slash and dot-dot in wallet id for createPaymentLink", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: {} }));
     await createPaymentLink(TOKEN, "../w" as WalletId, { name: "n" });
-    expect(lastUrl()).toContain("/v1/wallets/%2E%2Ew/payment-links");
+    expect(lastUrl()).toContain("/v1/wallets/..%2Fw/payment-links");
   });
 
   it("encodes slash and dot-dot in wallet id for setPaymentLinkActive", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: {} }));
     await setPaymentLinkActive(TOKEN, "../w" as WalletId, "l", true);
-    expect(lastUrl()).toContain("/v1/wallets/%2E%2Ew/payment-links/l");
+    expect(lastUrl()).toContain("/v1/wallets/..%2Fw/payment-links/l");
   });
 
   it("encodes slash and dot-dot in wallet id and link id for listPaymentLinkPayments", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, { statusCode: 200, message: "ok", data: { data: [] } }));
     await listPaymentLinkPayments(TOKEN, "../w" as WalletId, "../l");
-    expect(lastUrl()).toContain("/v1/wallets/%2E%2Ew/payment-links/%2E%2El/payments");
+    expect(lastUrl()).toContain("/v1/wallets/..%2Fw/payment-links/..%2Fl/payments");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { errorMessage } from "@/lib/api";
-import { payUrl } from "@/lib/format";
+import { paymentLinkUrl } from "@/lib/format";
 import { use, useCallback, useState } from "react";
 import { useCursorPagination } from "@/lib/useCursorPagination";
 import { useAuth } from "@/lib/useAuth";
@@ -223,7 +223,7 @@ export default function PaymentLinksPage({
             </p>
             <CopyField
               label="Payment link"
-              value={created.url ?? payUrl(created.slug)}
+              value={paymentLinkUrl(created)}
               qr
             />
           </div>
