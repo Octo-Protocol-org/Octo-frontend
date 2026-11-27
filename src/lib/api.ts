@@ -81,6 +81,12 @@ function timeoutSignal(ms: number): AbortSignal {
   return controller.signal;
 }
 
+/** True when a path has a `.`/`..` segment (raw or %2E-encoded), which URL parsing would resolve away. */
+export function hasDotSegment(requestPath: string): boolean {
+  const pathname = requestPath.split(/[?#]/, 1)[0] ?? "";
+  return pathname.split("/").some((seg) => /^(\.|%2e){1,2}$/i.test(seg));
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & {
@@ -97,6 +103,8 @@ export async function apiFetch<T>(
     authFailureSignsOut?: boolean;
   } = {},
 ): Promise<T> {
+  // An id like `..` would otherwise re-target the request at a different endpoint.
+  if (hasDotSegment(path)) throw new ApiError("Invalid request path.", 400);
   const {
     token,
     signal: callerSignal,

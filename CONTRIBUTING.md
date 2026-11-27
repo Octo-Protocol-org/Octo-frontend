@@ -44,6 +44,30 @@ pnpm build
 
 All five must pass before a pull request is merged.
 
+## Writing tests
+
+Vitest runs two projects (see `vitest.config.ts`):
+
+- **node** — `src/**/*.test.ts`. The default, for pure logic.
+- **dom** — `src/**/*.test.tsx` and hook tests (`src/**/use*.test.ts`), run in
+  [happy-dom](https://github.com/capricorn86/happy-dom) with
+  [Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
+
+Conventions:
+
+- A plain `.test.ts` that needs browser APIs (`window`, `localStorage`, events)
+  opts in with `// @vitest-environment happy-dom` on its first line.
+- Never define your own `window` or `localStorage`. Use the real ones, and
+  `vi.spyOn(Storage.prototype, "getItem")` (or similar) to simulate failures.
+- `src/test/setup.ts` runs after every test: it unmounts rendered components,
+  clears `localStorage`/`sessionStorage`, and resets mocks, spies, stubbed
+  globals/envs and fake timers. Tests don't need their own teardown for these.
+- Render components with `render`/`screen`, drive them with `userEvent`, and
+  query by role or label. `@testing-library/jest-dom` matchers
+  (`toBeInTheDocument`, `toHaveValue`, …) are available everywhere.
+- Mock the network boundary (`vi.mock("@/lib/sdk", …)`), not the code under
+  test. For example, the withdraw tests build and sign real transactions.
+
 ## Security expectations
 
 These expectations come from `AGENTS.md` and apply to every contribution:

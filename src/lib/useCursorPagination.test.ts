@@ -1,170 +1,153 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { useCursorPagination } from './useCursorPagination';
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { Paginated } from "./pagination";
+import { useCursorPagination } from "./useCursorPagination";
 
 type Row = { id: string };
 
-type Page = {
-  rows: Row[];
-  nextCursor: string | null;
-  prevCursor: string | null;
-};
+const page = (ids: string[], next: string | null = null): Paginated<Row> => ({
+  data: ids.map((id) => ({ id })),
+  next_cursor: next,
+});
 
-function makePage(ids: string[], nextCursor: string | null = null, prevCursor: string | null = null): Page {
-  return {
-    rows: ids.map((id) => ({ id })),
-    nextCursor,
-    prevCursor,
-  };
+// A promise whose resolution the test controls, to reorder responses.
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
-describe('useCursorPagination', () => {
-  it('drops a stale response when a newer request has started', async () => {
-    const resolvers: Array<(page: Page) => void> = [];
+// Three pages linked by cursors c1 -> c2.
+const PAGES: Record<string, Paginated<Row>> = {
+  first: page(["a"], "c1"),
+  c1: page(["b"], "c2"),
+  c2: page(["c"], null),
+};
+const linkedFetch = () => vi.fn(async (before: string | null): Promise<Paginated<Row>> => PAGES[before ?? "first"]!);
 
-    const fetchPage = vi.fn(
-      (_cursor: string | null, _direction: 'next' | 'prev' | 'refresh') =>
-        new Promise<Page>((resolve) => {
-          resolvers.push(resolve);
-        }),
-    );
+describe("useCursorPagination", () => {
+  it("loads page 1 with fetchPage(null) and sets rows, hasNext and loaded", async () => {
+    const fetchPage = linkedFetch();
+    const { result } = renderHook(() => useCursorPagination(fetchPage, [], "failed"));
 
-    const { result } = renderHook(() =>
-      useCursorPagination<Row, Page>({
-        fetchPage,
-        getRows: (page) => page.rows,
-        getNextCursor: (page) => page.nextCursor,
-        getPrevCursor: (page) => page.prevCursor,
-      }),
-    );
+    expect(result.current.loaded).toBe(false);
+    await waitFor(() => expect(result.current.loaded).toBe(true));
 
-    // Initial request.
-    await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(1));
-
-    // Start a second request via next().
-    act(() => {
-      void result.current.next();
-    });
-
-    await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
-
-    // Resolve the newer request first, then the stale one.
-    await act(async () => {
-      resolvers[1](makePage(['new'], 'cursor-new'));
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(result.current.rows).toEqual([{ id: 'new' }]));
-
-    await act(async () => {
-      resolvers[0](makePage(['stale'], 'cursor-stale'));
-      await Promise.resolve();
-    });
-
-    // Stale response must not overwrite the newer rows.
-    expect(result.current.rows).toEqual([{ id: 'new' }]);
+    expect(fetchPage).toHaveBeenCalledExactlyOnceWith(null);
+    expect(result.current.rows).toEqual([{ id: "a" }]);
+    expect(result.current.hasNext).toBe(true);
+    expect(result.current.hasPrev).toBe(false);
+    expect(result.current.page).toBe(1);
+    expect(result.current.loading).toBe(false);
   });
 
-  it('tracks next/prev cursor bookkeeping', async () => {
-    const fetchPage = vi.fn(
-      async (cursor: string | null, _direction: 'next' | 'prev' | 'refresh'): Promise<Page> => {
-        if (cursor === null) {
-          return makePage(['a'], 'cursor-1', null);
-        }
-        if (cursor === 'cursor-1') {
-          return makePage(['b'], 'cursor-2', null);
-        }
-        if (cursor === 'cursor-2') {
-          return makePage(['c'], null, 'cursor-1');
-        }
-        return makePage(['a'], 'cursor-1', null);
-      },
-    );
+  it("next() pushes the cursor and prev() re-requests the previous cursor", async () => {
+    const fetchPage = linkedFetch();
+    const { result } = renderHook(() => useCursorPagination(fetchPage, [], "failed"));
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "a" }]));
 
-    const { result } = renderHook(() =>
-      useCursorPagination<Row, Page>({
-        fetchPage,
-        getRows: (page) => page.rows,
-        getNextCursor: (page) => page.nextCursor,
-        getPrevCursor: (page) => page.prevCursor,
-      }),
-    );
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "b" }]));
+    expect(fetchPage).toHaveBeenLastCalledWith("c1");
+    expect(result.current.page).toBe(2);
 
-    await waitFor(() => expect(result.current.rows).toEqual([{ id: 'a' }]));
-    expect(fetchPage).toHaveBeenLastCalledWith(null, 'next');
-    expect(result.current.pageIndex).toBe(0);
-    expect(result.current.hasPrev).toBe(false);
-    expect(result.current.hasNext).toBe(true);
-
-    await act(async () => {
-      await result.current.next();
-    });
-
-    expect(fetchPage).toHaveBeenLastCalledWith('cursor-1', 'next');
-    expect(result.current.rows).toEqual([{ id: 'b' }]);
-    expect(result.current.pageIndex).toBe(1);
-    expect(result.current.hasPrev).toBe(true);
-    expect(result.current.hasNext).toBe(true);
-
-    await act(async () => {
-      await result.current.next();
-    });
-
-    expect(fetchPage).toHaveBeenLastCalledWith('cursor-2', 'next');
-    expect(result.current.rows).toEqual([{ id: 'c' }]);
-    expect(result.current.pageIndex).toBe(2);
-    expect(result.current.hasPrev).toBe(true);
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "c" }]));
+    expect(fetchPage).toHaveBeenLastCalledWith("c2");
     expect(result.current.hasNext).toBe(false);
 
-    await act(async () => {
-      await result.current.prev();
-    });
+    act(() => result.current.prev());
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "b" }]));
+    expect(fetchPage).toHaveBeenLastCalledWith("c1");
+    expect(result.current.page).toBe(2);
 
-    expect(fetchPage).toHaveBeenLastCalledWith('cursor-1', 'prev');
-    expect(result.current.rows).toEqual([{ id: 'b' }]);
-    expect(result.current.pageIndex).toBe(1);
-    expect(result.current.hasPrev).toBe(true);
-    expect(result.current.hasNext).toBe(true);
+    act(() => result.current.prev());
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "a" }]));
+    expect(fetchPage).toHaveBeenLastCalledWith(null);
+    expect(result.current.hasPrev).toBe(false);
   });
 
-  it('performs a silent refresh without toggling loading', async () => {
-    let callCount = 0;
-    const fetchPage = vi.fn(
-      async (_cursor: string | null, _direction: 'next' | 'prev' | 'refresh'): Promise<Page> => {
-        callCount += 1;
-        if (callCount === 1) {
-          return makePage(['a'], 'cursor-1', null);
-        }
-        return makePage(['a-updated'], 'cursor-1', null);
-      },
+  it("ignores a slow page-1 response that arrives after page 2", async () => {
+    const first = deferred<Paginated<Row>>();
+    const second = deferred<Paginated<Row>>();
+    const fetchPage = vi
+      .fn<(before: string | null) => Promise<Paginated<Row>>>()
+      .mockResolvedValueOnce(page(["a"], "c1"))
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useCursorPagination(fetchPage, [], "failed"));
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "a" }]));
+
+    // A refresh of page 1 is in flight when the user moves to page 2.
+    act(() => void result.current.refresh());
+    act(() => result.current.next());
+    expect(fetchPage).toHaveBeenCalledTimes(3);
+
+    await act(async () => second.resolve(page(["b"])));
+    await act(async () => first.resolve(page(["stale"], "c1")));
+
+    expect(result.current.rows).toEqual([{ id: "b" }]);
+    expect(result.current.hasNext).toBe(false);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("refreshSilently() neither toggles loading nor overwrites error", async () => {
+    const silent = deferred<Paginated<Row>>();
+    const fetchPage = vi
+      .fn<(before: string | null) => Promise<Paginated<Row>>>()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockReturnValueOnce(silent.promise)
+      .mockRejectedValueOnce(new Error("silent failure"));
+    const { result } = renderHook(() => useCursorPagination(fetchPage, [], "failed"));
+    await waitFor(() => expect(result.current.error).toBe("boom"));
+
+    act(() => void result.current.refreshSilently());
+    expect(result.current.loading).toBe(false);
+    await act(async () => silent.resolve(page(["a"])));
+    expect(result.current.rows).toEqual([{ id: "a" }]);
+    expect(result.current.loading).toBe(false);
+
+    // A failed silent refresh keeps the current rows and does not surface an error.
+    await act(async () => result.current.refreshSilently());
+    expect(result.current.rows).toEqual([{ id: "a" }]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("resets to page 1 when deps change", async () => {
+    const fetchPage = linkedFetch();
+    const { result, rerender } = renderHook(
+      ({ walletId }) => useCursorPagination(fetchPage, [walletId], "failed"),
+      { initialProps: { walletId: "w1" } },
+    );
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "a" }]));
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.page).toBe(2));
+
+    rerender({ walletId: "w2" });
+
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "a" }]));
+    expect(result.current.page).toBe(1);
+    expect(result.current.hasPrev).toBe(false);
+    expect(fetchPage).toHaveBeenLastCalledWith(null);
+  });
+
+  it("makes no request while enabled is false", async () => {
+    const fetchPage = linkedFetch();
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useCursorPagination(fetchPage, [], "failed", enabled),
+      { initialProps: { enabled: false } },
     );
 
-    const { result } = renderHook(() =>
-      useCursorPagination<Row, Page>({
-        fetchPage,
-        getRows: (page) => page.rows,
-        getNextCursor: (page) => page.nextCursor,
-        getPrevCursor: (page) => page.prevCursor,
-      }),
-    );
+    await act(async () => {});
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(result.current.loaded).toBe(false);
 
-    await waitFor(() => expect(result.current.rows).toEqual([{ id: 'a' }]));
-    expect(result.current.loading).toBe(false);
-
-    let refreshPromise: Promise<void> | undefined;
-    act(() => {
-      refreshPromise = result.current.refresh();
-    });
-
-    // Loading must remain false during a silent refresh.
-    expect(result.current.loading).toBe(false);
-
-    await act(async () => {
-      await refreshPromise;
-    });
-
-    expect(result.current.loading).toBe(false);
-    expect(result.current.rows).toEqual([{ id: 'a-updated' }]);
-    expect(fetchPage).toHaveBeenLastCalledWith(null, 'refresh');
+    rerender({ enabled: true });
+    await waitFor(() => expect(fetchPage).toHaveBeenCalledExactlyOnceWith(null));
   });
 });

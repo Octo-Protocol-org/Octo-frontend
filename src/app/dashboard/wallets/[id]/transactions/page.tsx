@@ -369,7 +369,7 @@ function TransactionDetail({
 
         {tx.stellar_tx_hash && (
           <a
-            href={explorerTxUrl(tx.stellar_tx_hash)}
+            href={explorerTxUrl(tx.stellar_tx_hash) ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="block text-center text-xs text-burgundy-bright underline decoration-burgundy-bright/40 underline-offset-2 transition-colors hover:decoration-burgundy-bright"

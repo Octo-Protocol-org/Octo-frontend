@@ -1013,7 +1013,7 @@ export default function PayPage({
                     </span>{" "}
                     ·{" "}
                     <a
-                      href={explorerTxUrl(signedTxHash)}
+                      href={explorerTxUrl(signedTxHash) ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-foreground underline hover:no-underline"
@@ -1082,7 +1082,7 @@ export default function PayPage({
                 )}
                 {txRef && isStellarTxHash(txRef) && (
                   <a
-                    href={explorerTxUrl(txRef)}
+                    href={explorerTxUrl(txRef) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-block text-xs font-medium text-foreground underline hover:no-underline"

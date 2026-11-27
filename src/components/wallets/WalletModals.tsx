@@ -10,7 +10,6 @@ import { DepositQrCodes } from "@/components/qr/DepositQrCodes";
 import { errorMessage, errorText } from "@/lib/api";
 import { usdcForNetwork, getWhitelistConfig, listWhitelistedAddresses, type Address, type Balance, type WhitelistedAddress } from "@/lib/wallets";
 import { explorerAccountUrl, explorerTxUrl, network } from "@/lib/network";
-import { Transaction, TransactionBuilder, FeeBumpTransaction } from "@stellar/stellar-base";
 import {
   unlockWallet, getSigningInfo, submitSigned, requestWithdrawOtp, confirmWithdraw,
   getAccountExists, buildSignedPayment, buildSignedChangeTrust, buildSignedCreateAccount,
@@ -48,7 +47,7 @@ export function TrustlineModal({
     status: string;
     hash: string | null;
     detail: string | null;
-  }> | null>(null);
+  } | null>(null);
 
   useEffect(() => {
     getSigningInfo(token, walletId).then(setSigningInfo).catch(() => setSigningInfo(null));
@@ -131,7 +130,7 @@ export function TrustlineModal({
           </p>
           {result.hash && (
             <a
-              href={explorerTxUrl(result.hash)}
+              href={explorerTxUrl(result.hash) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               title="View transaction on Stellar Explorer"
@@ -166,7 +165,7 @@ export function TrustlineModal({
         <p className="text-muted">
           Issuer: <span className="break-all font-mono text-foreground">{usdc.issuer}</span>
         </p>
-        <a href={explorerAccountUrl(usdc.issuer)} target="_blank" rel="noopener noreferrer" className="inline-block text-burgundy-bright underline">View issuer on Stellar Expert</a>
+        <a href={explorerAccountUrl(usdc.issuer) ?? undefined} target="_blank" rel="noopener noreferrer" className="inline-block text-burgundy-bright underline">View issuer on Stellar Expert</a>
       </div>
 
       {hasTrustline ? (
@@ -292,6 +291,14 @@ type WithdrawAsset = {
 
 /** Stop accepting the code this long before maxTime so the relay can still reach the network. */
 const EXPIRY_MARGIN_MS = 10_000;
+
+// True when the memo decoded from the signed envelope is exactly the one the user entered.
+function sameMemo(a: Memo | undefined, b: Memo | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  if (a.type === "text" && b.type === "text") return a.text === b.text;
+  if (a.type === "id" && b.type === "id") return a.id === b.id;
+  return false;
+}
 
 export function WithdrawModal({
   token,
@@ -581,19 +588,14 @@ export function WithdrawModal({
             memo: memoPayload,
           });
       const decoded = describeSignedWithdrawal(signedXdr, info.network_passphrase);
-      const expectedMemo = memoPayload;
-      const memoMatches = decoded.memo?.type === expectedMemo?.type &&
-        (decoded.memo?.type === "text"
-          ? decoded.memo.text === expectedMemo?.text
-          : decoded.memo?.type === "id"
-            ? decoded.memo.id === expectedMemo?.id
-            : !expectedMemo);
+      // Compare amounts in stroops: the envelope always carries 7 decimals ("5.0000000"), the input may not.
+      const decodedAmount = parseAmount(decoded.amount);
       if (decoded.needsCreate !== reviewedNeedsCreate ||
           decoded.destination !== destination.trim() ||
-          decoded.amount !== normalized ||
+          !decodedAmount.ok || decodedAmount.stroops !== checked.stroops ||
           decoded.assetCode !== selected.code ||
           decoded.assetIssuer !== selected.asset?.issuer ||
-          !memoMatches) {
+          !sameMemo(decoded.memo, memoPayload)) {
         throw new Error("The signed withdrawal does not match the reviewed details. Go back and review it again.");
       }
       await requestWithdrawOtp(token, walletId, signedXdr);
@@ -703,7 +705,7 @@ export function WithdrawModal({
           )}
           {result.stellar_tx_hash && (
             <a
-              href={explorerTxUrl(result.stellar_tx_hash)}
+              href={explorerTxUrl(result.stellar_tx_hash) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               title="View transaction on Stellar Explorer"
@@ -860,22 +862,7 @@ export function WithdrawModal({
           </p>
         )}
 
-        {signedTxDetails && (
-          <div className="mt-3 space-y-1 rounded-lg border border-border bg-surface-sunken px-3 py-2 text-xs">
-            <div className="flex flex-col gap-1">
-              <span className="text-muted">Destination:</span>
-              <HighlightedAddress address={signedTxDetails.destination} />
-            </div>
-            <p className="text-muted">
-              Amount: <span className="text-foreground">{signedTxDetails.amount} {signedTxDetails.assetCode}</span>
-            </p>
-            {signedTxDetails.assetIssuer && (
-              <p className="text-muted">
-                Issuer: <span className="break-all font-mono text-foreground">{signedTxDetails.assetIssuer}</span>
-              </p>
-            )}
-          </div>
-        )}        <p
+        <p
           className={`mt-3 text-center text-xs ${secondsLeft <= 30 ? "text-warning" : "text-muted"}`}
           aria-live="polite"
         >

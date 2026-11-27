@@ -179,7 +179,7 @@ function HashCell({ hash }: { hash: string | null }) {
   return (
     <span className="flex items-center gap-2">
       <a
-        href={explorerTxUrl(hash)}
+        href={explorerTxUrl(hash) ?? undefined}
         target="_blank"
         rel="noopener noreferrer"
         className="font-mono text-xs text-foreground hover:underline"

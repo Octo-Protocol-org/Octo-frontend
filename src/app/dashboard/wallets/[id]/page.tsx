@@ -404,7 +404,7 @@ export default function WalletOverview({
                           <td className="py-3 font-mono text-xs">
                             {t.stellar_tx_hash ? (
                               <a
-                                href={explorerTxUrl(t.stellar_tx_hash)}
+                                href={explorerTxUrl(t.stellar_tx_hash) ?? undefined}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="View transaction on Stellar Explorer"

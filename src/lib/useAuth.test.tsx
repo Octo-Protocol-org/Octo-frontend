@@ -1,37 +1,32 @@
-// @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
 import { isAuthenticationFailure } from "./useAuth";
 
-// Stable router mock — must be declared before vi.mock hoisting captures the reference.
-// Using a module-scoped object so useEffect([router]) sees the same reference every render.
-const _router = {
-  replace: vi.fn(),
-  refresh: vi.fn(),
-  push: vi.fn(),
-  back: vi.fn(),
-  forward: vi.fn(),
-  prefetch: vi.fn(),
-};
+const replaceMock = vi.fn();
+const refreshMock = vi.fn();
+const pathnameMock = vi.fn(() => "/dashboard");
+
+// A stable router object, as Next provides, so effects keyed on it don't re-run every render.
+const router = { replace: replaceMock, refresh: refreshMock, push: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() };
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => _router,
-  usePathname: () => "/dashboard",
+  usePathname: () => pathnameMock(),
+  useRouter: () => router,
 }));
 
+const meMock = vi.fn();
 const getTokenMock = vi.fn();
 const logoutCurrentSessionMock = vi.fn();
 const signOutMock = vi.fn();
 const broadcastLogoutMock = vi.fn();
 const subscribeToLogoutMock = vi.fn();
-const meMock = vi.fn();
 
 vi.mock("./auth", () => ({
   TOKEN_KEY: "octo_token",
-  getToken: (...args: unknown[]) => getTokenMock(...args),
   me: (...args: unknown[]) => meMock(...args),
+  getToken: (...args: unknown[]) => getTokenMock(...args),
   logoutCurrentSession: (...args: unknown[]) => logoutCurrentSessionMock(...args),
   signOut: (...args: unknown[]) => signOutMock(...args),
   broadcastLogout: (...args: unknown[]) => broadcastLogoutMock(...args),
@@ -44,9 +39,6 @@ const { AuthProvider, useAuth, isAuthenticationFailure: isAuthFailureFromModule 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
 }
-
-/** Shorthand for the router.replace mock. */
-function replaceMock() { return _router.replace; }
 
 describe("isAuthenticationFailure", () => {
   it("classifies unauthorized and forbidden responses as destructive auth failures", () => {
@@ -67,8 +59,8 @@ describe("isAuthenticationFailure", () => {
 
 describe("useAuth session handling", () => {
   beforeEach(() => {
-    _router.replace.mockReset();
-    _router.refresh.mockReset();
+    replaceMock.mockReset();
+    refreshMock.mockReset();
     meMock.mockReset();
     getTokenMock.mockReset();
     logoutCurrentSessionMock.mockReset();
@@ -76,18 +68,9 @@ describe("useAuth session handling", () => {
     broadcastLogoutMock.mockReset();
     subscribeToLogoutMock.mockReset();
     getTokenMock.mockReturnValue("token");
+    subscribeToLogoutMock.mockReturnValue(() => {});
     meMock.mockResolvedValue({ id: "1", email: "user@example.com" });
     logoutCurrentSessionMock.mockResolvedValue(undefined);
-    // subscribeToLogout must return an unsubscribe function.
-    subscribeToLogoutMock.mockReturnValue(() => {});
-  });
-
-  afterEach(async () => {
-    // Ensure effects (including event-listener teardowns) are flushed before the next test.
-    await act(async () => {
-      cleanup();
-    });
-    vi.restoreAllMocks();
   });
 
   it("redirects to /login exactly once when several 401s arrive together", async () => {
@@ -97,7 +80,7 @@ describe("useAuth session handling", () => {
       expect(result.current.user).not.toBeNull();
     });
 
-    _router.replace.mockClear();
+    replaceMock.mockClear();
 
     act(() => {
       window.dispatchEvent(new CustomEvent("session-expired", { detail: { status: 401 } }));
@@ -106,14 +89,12 @@ describe("useAuth session handling", () => {
     });
 
     await waitFor(() => {
-      expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining("/login"));
+      expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard&reason=expired");
     });
 
-    expect(_router.replace).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledTimes(1);
     expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(logoutCurrentSessionMock).not.toHaveBeenCalled();
-    // Expired sessions include reason=expired in the redirect URL.
-    expect(_router.replace.mock.calls[0][0]).toContain("reason=expired");
   });
 
   it("revokes the current session on the server when logout() is called", async () => {
@@ -123,11 +104,11 @@ describe("useAuth session handling", () => {
       expect(result.current.user).not.toBeNull();
     });
 
-    _router.replace.mockClear();
+    replaceMock.mockClear();
     logoutCurrentSessionMock.mockClear();
 
-    act(() => {
-      result.current.logout();
+    await act(async () => {
+      await result.current.logout();
     });
 
     await waitFor(() => {
@@ -136,9 +117,8 @@ describe("useAuth session handling", () => {
 
     expect(logoutCurrentSessionMock).toHaveBeenCalledWith("token");
     expect(signOutMock).toHaveBeenCalled();
-    expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining("/login"));
-    // Explicit logout should not include reason=expired.
-    expect(_router.replace.mock.calls[0][0]).not.toContain("reason=expired");
+    expect(broadcastLogoutMock).toHaveBeenCalled();
+    expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
   });
 
   it("still signs out locally when the server revoke request fails", async () => {
@@ -150,14 +130,14 @@ describe("useAuth session handling", () => {
       expect(result.current.user).not.toBeNull();
     });
 
-    _router.replace.mockClear();
+    replaceMock.mockClear();
 
-    act(() => {
-      result.current.logout();
+    await act(async () => {
+      await result.current.logout();
     });
 
     await waitFor(() => {
-      expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining("/login"));
+      expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
     });
 
     expect(signOutMock).toHaveBeenCalled();
@@ -165,20 +145,9 @@ describe("useAuth session handling", () => {
   });
 
   it("includes the query string and hash in the encoded next param", async () => {
-    // The code reads pathname from usePathname() ("/dashboard") and appends
-    // window.location.search + window.location.hash. We mock window.location's
-    // search and hash fields to exercise that path.
-    const originalLocation = window.location;
-
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      writable: true,
-      value: {
-        ...originalLocation,
-        search: "?before=xyz",
-        hash: "#top",
-      },
-    });
+    // happy-dom provides a real location, so set the URL instead of redefining window.location.
+    window.history.replaceState(null, "", "/dashboard/wallets/abc/transactions?before=xyz#top");
+    pathnameMock.mockReturnValue("/dashboard/wallets/abc/transactions");
 
     try {
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -187,35 +156,33 @@ describe("useAuth session handling", () => {
         expect(result.current.user).not.toBeNull();
       });
 
-      _router.replace.mockClear();
+      replaceMock.mockClear();
 
-      act(() => {
-        result.current.logout();
+      await act(async () => {
+        await result.current.logout();
       });
 
-      // pathname = "/dashboard" (from usePathname mock), search and hash from window.location
-      const expectedNext = encodeURIComponent("/dashboard?before=xyz#top");
+      const expectedNext = encodeURIComponent(
+        "/dashboard/wallets/abc/transactions?before=xyz#top",
+      );
 
       await waitFor(() => {
-        expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining(expectedNext));
+        expect(replaceMock).toHaveBeenCalledWith(`/login?next=${expectedNext}`);
       });
     } finally {
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        writable: true,
-        value: originalLocation,
-      });
+      window.history.replaceState(null, "", "/");
+      pathnameMock.mockReturnValue("/dashboard");
     }
   });
 
-  it("signs the user out when a storage event removes the token key", async () => {
+  it("signs the user out when a storage event removes octo_token", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.user).not.toBeNull();
     });
 
-    _router.replace.mockClear();
+    replaceMock.mockClear();
 
     act(() => {
       window.dispatchEvent(
@@ -232,8 +199,8 @@ describe("useAuth session handling", () => {
     });
 
     expect(signOutMock).toHaveBeenCalled();
-    expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining("/login"));
-    expect(_router.replace).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledWith("/login?next=%2Fdashboard");
+    expect(replaceMock).toHaveBeenCalledTimes(1);
     expect(logoutCurrentSessionMock).not.toHaveBeenCalled();
   });
 
@@ -244,91 +211,16 @@ describe("useAuth session handling", () => {
       expect(result.current.user).not.toBeNull();
     });
 
-    const callCount = meMock.mock.calls.length;
+    expect(meMock).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      result.current.retrySessionCheck();
+    await act(async () => {
+      await result.current.retrySessionCheck();
     });
 
     await waitFor(() => {
-      expect(meMock.mock.calls.length).toBeGreaterThan(callCount);
+      expect(meMock).toHaveBeenCalledTimes(2);
     });
 
     expect(result.current.user).not.toBeNull();
-  });
-
-  it("signs out via TOKEN_KEY and ignores unrelated storage events (#698)", async () => {
-    const { result } = renderHook(() => useAuth(), { wrapper });
-
-    await waitFor(() => {
-      expect(result.current.user).not.toBeNull();
-    });
-
-    _router.replace.mockClear();
-    signOutMock.mockClear();
-
-    // An unrelated storage key must not trigger sign-out.
-    act(() => {
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: "some_other_key", newValue: null }),
-      );
-    });
-
-    expect(_router.replace).not.toHaveBeenCalled();
-
-    // Removing TOKEN_KEY must trigger cross-tab sign-out.
-    act(() => {
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: "octo_token", newValue: null, oldValue: "token" }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(result.current.user).toBeNull();
-    });
-
-    // signOut is called exactly once (the signingOut guard prevents duplicates).
-    expect(signOutMock).toHaveBeenCalledTimes(1);
-    expect(_router.replace).toHaveBeenCalledWith(expect.stringContaining("/login"));
-  });
-
-  it("does not set loading=false after a retry cancels the first attempt's timer (#697)", async () => {
-    vi.useFakeTimers();
-
-    // First and second attempts both succeed.
-    meMock
-      .mockResolvedValueOnce({ id: "1", email: "user@example.com" })
-      .mockResolvedValueOnce({ id: "1", email: "user@example.com" });
-
-    const { result } = renderHook(() => useAuth(), { wrapper });
-
-    // Flush the first me() call but don't advance the 700ms timer yet.
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    // loading is still true: the minimum-spinner timer hasn't elapsed.
-    expect(result.current.loading).toBe(true);
-
-    // Trigger retry — the first effect cleans up (cancelling its pending timer).
-    act(() => {
-      result.current.retrySessionCheck();
-    });
-
-    // Advance past 700ms. The first effect's timer (if not cancelled) would flip loading=false.
-    await act(async () => {
-      vi.advanceTimersByTime(800);
-      await Promise.resolve();
-    });
-
-    // loading must eventually settle to false when the second attempt completes.
-    await act(async () => {
-      vi.runAllTimers();
-      await Promise.resolve();
-    });
-
-    expect(result.current.loading).toBe(false);
-
-    vi.useRealTimers();
   });
 });

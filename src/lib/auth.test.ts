@@ -1,55 +1,11 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { safeNextPath } from "./safeNext";
-
-/**
- * Build a localStorage-compatible stub where stored keys are enumerable own properties,
- * matching how Object.keys(localStorage) behaves in a real browser.
- */
-function makeLocalStorage(): Storage {
-  // Keep items in a map; expose them as enumerable properties via a Proxy.
-  const items = new Map<string, string>();
-
-  const handler: ProxyHandler<object> = {
-    get(_t, prop: string) {
-      if (prop === "getItem") return (k: string) => items.get(k) ?? null;
-      if (prop === "setItem") return (k: string, v: string) => { items.set(k, v); };
-      if (prop === "removeItem") return (k: string) => { items.delete(k); };
-      if (prop === "clear") return () => items.clear();
-      if (prop === "length") return items.size;
-      if (prop === "key") return (i: number) => [...items.keys()][i] ?? null;
-      // Enumerate stored keys as direct property access too.
-      return items.get(prop) ?? undefined;
-    },
-    set(_t, prop: string, value: string) {
-      items.set(prop, value);
-      return true;
-    },
-    has(_t, prop: string) {
-      return items.has(prop);
-    },
-    ownKeys() {
-      return [...items.keys()];
-    },
-    getOwnPropertyDescriptor(_t, prop: string) {
-      if (!items.has(prop)) return undefined;
-      return { configurable: true, enumerable: true, value: items.get(prop) };
-    },
-  };
-
-  return new Proxy({}, handler) as unknown as Storage;
-}
 
 // ---------- #285 — signOut helper ----------
 
 describe("#285 signOut()", () => {
-  beforeEach(() => {
-    const storage = makeLocalStorage();
-    vi.stubGlobal("localStorage", storage);
-    vi.stubGlobal("window", { localStorage: storage });
-  });
-
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.resetModules();
   });
 
@@ -83,14 +39,7 @@ describe("#285 signOut()", () => {
 // ---------- #643 — logoutCurrentSession() ----------
 
 describe("#643 logoutCurrentSession()", () => {
-  beforeEach(() => {
-    const storage = makeLocalStorage();
-    vi.stubGlobal("localStorage", storage);
-    vi.stubGlobal("window", { localStorage: storage });
-  });
-
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.resetModules();
   });
 
@@ -176,14 +125,7 @@ describe("#286 same-origin guard", () => {
 // ---------- #611 — verify2fa request contract ----------
 
 describe("#611 verify2fa()", () => {
-  beforeEach(() => {
-    const storage = makeLocalStorage();
-    vi.stubGlobal("localStorage", storage);
-    vi.stubGlobal("window", { localStorage: storage });
-  });
-
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.resetModules();
   });
 
@@ -215,9 +157,7 @@ describe("#611 verify2fa()", () => {
 describe("#286 apiFetch emits session-expired on 401", () => {
   it("dispatches the event when a token request returns 401", async () => {
     const events: string[] = [];
-    vi.stubGlobal("window", {
-      dispatchEvent: (e: Event) => { events.push(e.type); },
-    });
+    vi.spyOn(window, "dispatchEvent").mockImplementation((e: Event) => { events.push(e.type); return true; });
 
     vi.stubGlobal("fetch", async () => ({
       ok: false,
@@ -232,9 +172,7 @@ describe("#286 apiFetch emits session-expired on 401", () => {
 
   it("does NOT emit session-expired for unauthenticated 401 (no token)", async () => {
     const events: string[] = [];
-    vi.stubGlobal("window", {
-      dispatchEvent: (e: Event) => { events.push(e.type); },
-    });
+    vi.spyOn(window, "dispatchEvent").mockImplementation((e: Event) => { events.push(e.type); return true; });
 
     vi.stubGlobal("fetch", async () => ({
       ok: false,
