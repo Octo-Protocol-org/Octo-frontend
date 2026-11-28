@@ -216,7 +216,7 @@ function WalletCard({
         <p role="alert" className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
           ⚠ Recovery phrase not confirmed —{" "}
           <a href={`/dashboard/wallets/${wallet.id}`} className="font-semibold underline">
-            confirm it now
+            view wallet to confirm
           </a>{" "}
           to protect your funds.
         </p>

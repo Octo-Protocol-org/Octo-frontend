@@ -39,6 +39,7 @@ import { RelativeTime } from "@/components/RelativeTime";
 import { Skeleton, TableRowSkeleton } from "@/components/Skeleton";
 
 import { WalletPageShell } from "@/components/dashboard/WalletPageShell";
+import { ConfirmPhraseModal } from "@/components/wallets/ConfirmPhraseModal";
 export default function WalletOverview({
   params,
 }: {
@@ -64,6 +65,9 @@ export default function WalletOverview({
   const [showRecover, setShowRecover] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [refreshingBalances, setRefreshingBalances] = useState(false);
+  const [showConfirmPhrase, setShowConfirmPhrase] = useState(false);
+  // Track local phrase-confirmation state so the banner dismisses without a reload.
+  const [phraseConfirmed, setPhraseConfirmed] = useState(false);
 
   function refresh() {
     if (!token) return;
@@ -192,10 +196,16 @@ export default function WalletOverview({
               }} />
             )}
             {/* Persistent warning for wallets whose recovery phrase was not confirmed */}
-            {isPhraseUnconfirmed(id) && (
+            {!phraseConfirmed && isPhraseUnconfirmed(id) && (
               <p role="alert" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
                 ⚠ You haven&apos;t confirmed your recovery phrase for this wallet. If you forget your encryption password without it, the funds will be unrecoverable.{" "}
-                <a href="/dashboard/wallets/new" className="font-semibold underline">Learn more</a>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPhrase(true)}
+                  className="font-semibold underline hover:text-warning/80"
+                >
+                  Confirm it now
+                </button>
               </p>
             )}
             {/* header */}
@@ -492,6 +502,18 @@ export default function WalletOverview({
           walletLabel={wallet?.label}
           onClose={() => setShowChangePassword(false)}
           onDone={() => setShowChangePassword(false)}
+        />
+      )}
+      {showConfirmPhrase && token && (
+        <ConfirmPhraseModal
+          token={token}
+          walletId={id}
+          walletAddress={wallet?.address}
+          onClose={() => setShowConfirmPhrase(false)}
+          onConfirmed={() => {
+            setShowConfirmPhrase(false);
+            setPhraseConfirmed(true);
+          }}
         />
       )}
   </>
